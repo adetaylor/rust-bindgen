@@ -35,7 +35,11 @@ pub struct nsBaseHashtable_LookupResult {
 }
 impl Default for nsBaseHashtable_LookupResult {
     fn default() -> Self {
-        unsafe { ::std::mem::zeroed() }
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
     }
 }
 #[repr(C)]
@@ -47,11 +51,19 @@ pub struct nsBaseHashtable_EntryPtr {
 }
 impl Default for nsBaseHashtable_EntryPtr {
     fn default() -> Self {
-        unsafe { ::std::mem::zeroed() }
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
     }
 }
 impl Default for nsBaseHashtable {
     fn default() -> Self {
-        unsafe { ::std::mem::zeroed() }
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
     }
 }

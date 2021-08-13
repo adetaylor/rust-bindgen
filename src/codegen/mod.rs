@@ -127,8 +127,8 @@ fn derives_of_item(item: &Item, ctx: &BindgenContext) -> DerivableTraits {
     if item.can_derive_copy(ctx) && !item.annotations().disallow_copy() {
         derivable_traits |= DerivableTraits::COPY;
 
-        if ctx.options().rust_features().builtin_clone_impls ||
-            !all_template_params.is_empty()
+        if ctx.options().rust_features().builtin_clone_impls
+            || !all_template_params.is_empty()
         {
             // FIXME: This requires extra logic if you have a big array in a
             // templated struct. The reason for this is that the magic:
@@ -384,21 +384,21 @@ impl AppendImplicitTemplateParams for proc_macro2::TokenStream {
             }
 
             // None of these types ever have implicit template parameters.
-            TypeKind::Void |
-            TypeKind::NullPtr |
-            TypeKind::Pointer(..) |
-            TypeKind::Reference(..) |
-            TypeKind::Int(..) |
-            TypeKind::Float(..) |
-            TypeKind::Complex(..) |
-            TypeKind::Array(..) |
-            TypeKind::TypeParam |
-            TypeKind::Opaque |
-            TypeKind::Function(..) |
-            TypeKind::Enum(..) |
-            TypeKind::ObjCId |
-            TypeKind::ObjCSel |
-            TypeKind::TemplateInstantiation(..) => return,
+            TypeKind::Void
+            | TypeKind::NullPtr
+            | TypeKind::Pointer(..)
+            | TypeKind::Reference(..)
+            | TypeKind::Int(..)
+            | TypeKind::Float(..)
+            | TypeKind::Complex(..)
+            | TypeKind::Array(..)
+            | TypeKind::TypeParam
+            | TypeKind::Opaque
+            | TypeKind::Function(..)
+            | TypeKind::Enum(..)
+            | TypeKind::ObjCId
+            | TypeKind::ObjCSel
+            | TypeKind::TemplateInstantiation(..) => return,
             _ => {}
         }
 
@@ -540,9 +540,9 @@ impl CodeGenerator for Module {
             }
         };
 
-        if !ctx.options().enable_cxx_namespaces ||
-            (self.is_inline() &&
-                !ctx.options().conservative_inline_namespaces)
+        if !ctx.options().enable_cxx_namespaces
+            || (self.is_inline()
+                && !ctx.options().conservative_inline_namespaces)
         {
             codegen_self(result, &mut false);
             return;
@@ -624,7 +624,10 @@ impl CodeGenerator for Var {
             attrs.push(attributes::doc(comment));
         }
 
-        let ty = self.ty().to_rust_ty_or_opaque(ctx, &()).ignore_annotations();
+        let ty = self
+            .ty()
+            .to_rust_ty_or_opaque(ctx, &())
+            .ignore_annotations();
 
         if let Some(val) = self.val() {
             match *val {
@@ -740,19 +743,19 @@ impl CodeGenerator for Type {
         debug_assert!(item.is_enabled_for_codegen(ctx));
 
         match *self.kind() {
-            TypeKind::Void |
-            TypeKind::NullPtr |
-            TypeKind::Int(..) |
-            TypeKind::Float(..) |
-            TypeKind::Complex(..) |
-            TypeKind::Array(..) |
-            TypeKind::Vector(..) |
-            TypeKind::Pointer(..) |
-            TypeKind::Reference(..) |
-            TypeKind::Function(..) |
-            TypeKind::ResolvedTypeRef(..) |
-            TypeKind::Opaque |
-            TypeKind::TypeParam => {
+            TypeKind::Void
+            | TypeKind::NullPtr
+            | TypeKind::Int(..)
+            | TypeKind::Float(..)
+            | TypeKind::Complex(..)
+            | TypeKind::Array(..)
+            | TypeKind::Vector(..)
+            | TypeKind::Pointer(..)
+            | TypeKind::Reference(..)
+            | TypeKind::Function(..)
+            | TypeKind::ResolvedTypeRef(..)
+            | TypeKind::Opaque
+            | TypeKind::TypeParam => {
                 // These items don't need code generation, they only need to be
                 // converted to rust types in fields, arguments, and such.
                 // NOTE(emilio): If you add to this list, make sure to also add
@@ -841,7 +844,9 @@ impl CodeGenerator for Type {
                     let (mut inner_ty, inner_annotations) = inner_item
                         .try_to_rust_ty_or_opaque(ctx, &())
                         .map(|ty| ty.to_outer_type())
-                        .unwrap_or_else(|_| (self.to_opaque(ctx, item), RustTyAnnotation::None));
+                        .unwrap_or_else(|_| {
+                            (self.to_opaque(ctx, item), RustTyAnnotation::None)
+                        });
                     inner_ty.append_implicit_template_params(ctx, inner_item);
                     (inner_ty, inner_annotations)
                 };
@@ -907,10 +912,10 @@ impl CodeGenerator for Type {
                     // paths, eg `good::dogs::Bront`.
                     'A'..='Z' | 'a'..='z' | '0'..='9' | ':' | '_' | ' ' => true,
                     _ => false,
-                }) && outer_params.is_empty() &&
-                    !is_opaque &&
-                    alias_style == AliasVariation::TypeAlias &&
-                    inner_item.expect_type().canonical_type(ctx).is_enum()
+                }) && outer_params.is_empty()
+                    && !is_opaque
+                    && alias_style == AliasVariation::TypeAlias
+                    && inner_item.expect_type().canonical_type(ctx).is_enum()
                 {
                     tokens.append_all(quote! {
                         pub use
@@ -927,7 +932,8 @@ impl CodeGenerator for Type {
                 let mut attributes = Vec::new();
                 if let Some(original_name) = item.original_name(ctx) {
                     if name != original_name {
-                        attributes.push(attributes::original_name(&original_name));
+                        attributes
+                            .push(attributes::original_name(&original_name));
                     }
                 }
 
@@ -1096,7 +1102,8 @@ impl<'a> TryToRustTy for Vtable<'a> {
         let name = ctx.rust_ident(self.canonical_name(ctx));
         Ok(quote! {
             #name
-        }.into())
+        }
+        .into())
     }
 }
 
@@ -1146,7 +1153,8 @@ impl CodeGenerator for TemplateInstantiation {
             let fn_name = ctx.rust_ident_raw(fn_name);
 
             let prefix = ctx.trait_prefix();
-            let ident = item.to_rust_ty_or_opaque(ctx, &()).ignore_annotations();
+            let ident =
+                item.to_rust_ty_or_opaque(ctx, &()).ignore_annotations();
             let size_of_expr = quote! {
                 ::#prefix::mem::size_of::<#ident>()
             };
@@ -1270,7 +1278,10 @@ impl<'a> FieldCodegen<'a> for FieldData {
         let field_item =
             self.ty().into_resolver().through_type_refs().resolve(ctx);
         let field_ty = field_item.expect_type();
-        let mut ty = self.ty().to_rust_ty_or_opaque(ctx, &()).ignore_annotations();
+        let mut ty = self
+            .ty()
+            .to_rust_ty_or_opaque(ctx, &())
+            .ignore_annotations();
         ty.append_implicit_template_params(ctx, field_item);
 
         // NB: If supported, we use proper `union` types.
@@ -1288,7 +1299,8 @@ impl<'a> FieldCodegen<'a> for FieldData {
         } else if let Some(item) = field_ty.is_incomplete_array(ctx) {
             result.saw_incomplete_array();
 
-            let inner = item.to_rust_ty_or_opaque(ctx, &()).ignore_annotations();
+            let inner =
+                item.to_rust_ty_or_opaque(ctx, &()).ignore_annotations();
 
             if ctx.options().enable_cxx_namespaces {
                 quote! {
@@ -1324,9 +1336,10 @@ impl<'a> FieldCodegen<'a> for FieldData {
             fields.extend(Some(padding_field));
         }
 
-        let is_private = (!self.is_public() &&
-            ctx.options().respect_cxx_access_specs) ||
-            self.annotations()
+        let is_private = (!self.is_public()
+            && ctx.options().respect_cxx_access_specs)
+            || self
+                .annotations()
                 .private_fields()
                 .unwrap_or(fields_should_be_private);
 
@@ -1525,7 +1538,10 @@ impl<'a> FieldCodegen<'a> for BitfieldUnit {
         let mut ctor_impl = quote! {};
 
         // We cannot generate any constructor if the underlying storage can't
-        // implement AsRef<[u8]> / AsMut<[u8]> / etc.
+        // implement AsRef<[u8]> / AsMut<[u8]> / etc, or can't derive Default.
+        //
+        // We don't check `larger_arrays` here because Default does still have
+        // the 32 items limitation.
         let mut generate_ctor = layout.size <= RUST_DERIVE_IN_ARRAY_LIMIT;
 
         let mut access_spec = !fields_should_be_private;
@@ -1535,7 +1551,9 @@ impl<'a> FieldCodegen<'a> for BitfieldUnit {
                 continue;
             }
 
-            if layout.size > RUST_DERIVE_IN_ARRAY_LIMIT {
+            if layout.size > RUST_DERIVE_IN_ARRAY_LIMIT
+                && !ctx.options().rust_features().larger_arrays
+            {
                 continue;
             }
 
@@ -1564,8 +1582,9 @@ impl<'a> FieldCodegen<'a> for BitfieldUnit {
             let param_name = bitfield_getter_name(ctx, bf);
             let bitfield_ty_item = ctx.resolve_item(bf.ty());
             let bitfield_ty = bitfield_ty_item.expect_type();
-            let bitfield_ty =
-                bitfield_ty.to_rust_ty_or_opaque(ctx, bitfield_ty_item).ignore_annotations();
+            let bitfield_ty = bitfield_ty
+                .to_rust_ty_or_opaque(ctx, bitfield_ty_item)
+                .ignore_annotations();
 
             ctor_params.push(quote! {
                 #param_name : #bitfield_ty
@@ -1655,8 +1674,9 @@ impl<'a> FieldCodegen<'a> for Bitfield {
                 }
             };
 
-        let bitfield_ty =
-            bitfield_ty.to_rust_ty_or_opaque(ctx, bitfield_ty_item).ignore_annotations();
+        let bitfield_ty = bitfield_ty
+            .to_rust_ty_or_opaque(ctx, bitfield_ty_item)
+            .ignore_annotations();
 
         let offset = self.offset_into_unit();
         let width = self.width() as u8;
@@ -1785,7 +1805,9 @@ impl CodeGenerator for CompInfo {
                 }
 
                 let inner_item = ctx.resolve_item(base.ty);
-                let mut inner = inner_item.to_rust_ty_or_opaque(ctx, &()).ignore_annotations();
+                let mut inner = inner_item
+                    .to_rust_ty_or_opaque(ctx, &())
+                    .ignore_annotations();
                 inner.append_implicit_template_params(ctx, &inner_item);
                 let field_name = ctx.rust_ident(&base.field_name);
 
@@ -1819,6 +1841,14 @@ impl CodeGenerator for CompInfo {
                     &mut fields,
                     &mut methods,
                     (),
+                );
+            }
+            // Check whether an explicit padding field is needed
+            // at the end.
+            if let Some(comp_layout) = layout {
+                fields.extend(
+                    struct_layout
+                        .add_tail_padding(&canonical_name, comp_layout),
                 );
             }
         }
@@ -1995,36 +2025,45 @@ impl CodeGenerator for CompInfo {
 
         let derivable_traits = derives_of_item(item, ctx);
         if !derivable_traits.contains(DerivableTraits::DEBUG) {
-            needs_debug_impl = ctx.options().derive_debug &&
-                ctx.options().impl_debug &&
-                !ctx.no_debug_by_name(item) &&
-                !item.annotations().disallow_debug();
+            needs_debug_impl = ctx.options().derive_debug
+                && ctx.options().impl_debug
+                && !ctx.no_debug_by_name(item)
+                && !item.annotations().disallow_debug();
         }
 
         if !derivable_traits.contains(DerivableTraits::DEFAULT) {
-            needs_default_impl = ctx.options().derive_default &&
-                !self.is_forward_declaration() &&
-                !ctx.no_default_by_name(item) &&
-                !item.annotations().disallow_default();
+            needs_default_impl = ctx.options().derive_default
+                && !self.is_forward_declaration()
+                && !ctx.no_default_by_name(item)
+                && !item.annotations().disallow_default();
         }
 
         let all_template_params = item.all_template_params(ctx);
 
-        if derivable_traits.contains(DerivableTraits::COPY) &&
-            !derivable_traits.contains(DerivableTraits::CLONE)
+        if derivable_traits.contains(DerivableTraits::COPY)
+            && !derivable_traits.contains(DerivableTraits::CLONE)
         {
             needs_clone_impl = true;
         }
 
         if !derivable_traits.contains(DerivableTraits::PARTIAL_EQ) {
-            needs_partialeq_impl = ctx.options().derive_partialeq &&
-                ctx.options().impl_partialeq &&
-                ctx.lookup_can_derive_partialeq_or_partialord(item.id()) ==
-                    CanDerive::Manually;
+            needs_partialeq_impl = ctx.options().derive_partialeq
+                && ctx.options().impl_partialeq
+                && ctx.lookup_can_derive_partialeq_or_partialord(item.id())
+                    == CanDerive::Manually;
         }
 
         let mut derives: Vec<_> = derivable_traits.into();
         derives.extend(item.annotations().derives().iter().map(String::as_str));
+
+        // The custom derives callback may return a list of derive attributes;
+        // add them to the end of the list.
+        let custom_derives;
+        if let Some(cb) = &ctx.options().parse_callbacks {
+            custom_derives = cb.add_derives(&canonical_name);
+            // In most cases this will be a no-op, since custom_derives will be empty.
+            derives.extend(custom_derives.iter().map(|s| s.as_str()));
+        };
 
         if !derives.is_empty() {
             attributes.push(attributes::derives(&derives))
@@ -2034,6 +2073,11 @@ impl CodeGenerator for CompInfo {
             if canonical_name != original_name {
                 attributes.push(attributes::original_name(&original_name));
             }
+        }
+
+        if item.annotations().must_use_type() || ctx.must_use_type_by_name(item)
+        {
+            attributes.push(attributes::must_use());
         }
 
         let mut tokens = if is_union && struct_layout.is_rust_union() {
@@ -2097,9 +2141,9 @@ impl CodeGenerator for CompInfo {
                     let size = layout.size;
                     let align = layout.align;
 
-                    let check_struct_align = if align >
-                        ctx.target_pointer_size() &&
-                        !ctx.options().rust_features().repr_align
+                    let check_struct_align = if align
+                        > ctx.target_pointer_size()
+                        && !ctx.options().rust_features().repr_align
                     {
                         None
                     } else {
@@ -2116,8 +2160,8 @@ impl CodeGenerator for CompInfo {
                         .base_members()
                         .iter()
                         .filter(|base| base.ty.has_vtable(ctx))
-                        .count() >
-                        1;
+                        .count()
+                        > 1;
 
                     let should_skip_field_offset_checks =
                         is_opaque || too_many_base_vtables;
@@ -2231,9 +2275,32 @@ impl CodeGenerator for CompInfo {
 
         if needs_default_impl {
             let prefix = ctx.trait_prefix();
+            let body = if ctx.options().rust_features().maybe_uninit {
+                quote! {
+                    let mut s = ::#prefix::mem::MaybeUninit::<Self>::uninit();
+                    unsafe {
+                        ::#prefix::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+                        s.assume_init()
+                    }
+                }
+            } else {
+                quote! {
+                    unsafe {
+                        let mut s: Self = ::#prefix::mem::uninitialized();
+                        ::#prefix::ptr::write_bytes(&mut s, 0, 1);
+                        s
+                    }
+                }
+            };
+            // Note we use `ptr::write_bytes()` instead of `mem::zeroed()` because the latter does
+            // not necessarily ensure padding bytes are zeroed. Some C libraries are sensitive to
+            // non-zero padding bytes, especially when forwards/backwards compatability is
+            // involved.
             result.push(quote! {
                 impl #generics Default for #ty_for_impl {
-                    fn default() -> Self { unsafe { ::#prefix::mem::zeroed() } }
+                    fn default() -> Self {
+                        #body
+                    }
                 }
             });
         }
@@ -2316,9 +2383,9 @@ impl MethodCodegen for Method {
                 MethodKind::Constructor => cc.constructors(),
                 MethodKind::Destructor => cc.destructors(),
                 MethodKind::VirtualDestructor { .. } => cc.destructors(),
-                MethodKind::Static |
-                MethodKind::Normal |
-                MethodKind::Virtual { .. } => cc.methods(),
+                MethodKind::Static
+                | MethodKind::Normal
+                | MethodKind::Virtual { .. } => cc.methods(),
             }
         });
 
@@ -2377,7 +2444,8 @@ impl MethodCodegen for Method {
             write!(&mut function_name, "{}", times_seen).unwrap();
         }
         let function_name = ctx.rust_ident(function_name);
-        let (mut args, args_attributes) = utils::fnsig_arguments(ctx, signature);
+        let (mut args, args_attributes) =
+            utils::fnsig_arguments(ctx, signature);
         let (mut ret, ret_attr) = utils::fnsig_return_ty(ctx, signature);
 
         if !self.is_static() && !self.is_constructor() {
@@ -2460,8 +2528,8 @@ impl MethodCodegen for Method {
         attrs.push(ret_attr);
         attrs.push(attributes::inline());
 
-        if signature.must_use() &&
-            ctx.options().rust_features().must_use_function
+        if signature.must_use()
+            && ctx.options().rust_features().must_use_function
         {
             attrs.push(attributes::must_use());
         }
@@ -2580,10 +2648,10 @@ impl<'a> EnumBuilder<'a> {
     /// Returns the depth of the code generation for a variant of this enum.
     fn codegen_depth(&self) -> usize {
         match *self {
-            EnumBuilder::Rust { codegen_depth, .. } |
-            EnumBuilder::NewType { codegen_depth, .. } |
-            EnumBuilder::ModuleConsts { codegen_depth, .. } |
-            EnumBuilder::Consts { codegen_depth, .. } => codegen_depth,
+            EnumBuilder::Rust { codegen_depth, .. }
+            | EnumBuilder::NewType { codegen_depth, .. }
+            | EnumBuilder::ModuleConsts { codegen_depth, .. }
+            | EnumBuilder::Consts { codegen_depth, .. } => codegen_depth,
         }
     }
 
@@ -2903,8 +2971,8 @@ impl CodeGenerator for Enum {
         let repr_translated;
         let repr = match self.repr().map(|repr| ctx.resolve_type(repr)) {
             Some(repr)
-                if !ctx.options().translate_enum_integer_types &&
-                    !variation.is_rust() =>
+                if !ctx.options().translate_enum_integer_types
+                    && !variation.is_rust() =>
             {
                 repr
             }
@@ -2971,12 +3039,12 @@ impl CodeGenerator for Enum {
         // TODO(emilio): Delegate this to the builders?
         match variation {
             EnumVariation::Rust { non_exhaustive } => {
-                if non_exhaustive &&
-                    ctx.options().rust_features().non_exhaustive
+                if non_exhaustive
+                    && ctx.options().rust_features().non_exhaustive
                 {
                     attrs.push(attributes::non_exhaustive());
-                } else if non_exhaustive &&
-                    !ctx.options().rust_features().non_exhaustive
+                } else if non_exhaustive
+                    && !ctx.options().rust_features().non_exhaustive
                 {
                     panic!("The rust target you're using doesn't seem to support non_exhaustive enums");
                 }
@@ -2995,16 +3063,21 @@ impl CodeGenerator for Enum {
             attrs.push(attributes::doc(comment));
         }
 
+        if item.annotations().must_use_type() || ctx.must_use_type_by_name(item)
+        {
+            attrs.push(attributes::must_use());
+        }
+
         if !variation.is_const() {
             let mut derives = derives_of_item(item, ctx);
             // For backwards compat, enums always derive Clone/Eq/PartialEq/Hash, even
             // if we don't generate those by default.
             derives.insert(
-                DerivableTraits::CLONE |
-                    DerivableTraits::COPY |
-                    DerivableTraits::HASH |
-                    DerivableTraits::PARTIAL_EQ |
-                    DerivableTraits::EQ,
+                DerivableTraits::CLONE
+                    | DerivableTraits::COPY
+                    | DerivableTraits::HASH
+                    | DerivableTraits::PARTIAL_EQ
+                    | DerivableTraits::EQ,
             );
             let derives: Vec<_> = derives.into();
             attrs.push(attributes::derives(&derives));
@@ -3052,7 +3125,8 @@ impl CodeGenerator for Enum {
 
         // A map where we keep a value -> variant relation.
         let mut seen_values = HashMap::<_, Ident>::default();
-        let enum_rust_ty = item.to_rust_ty_or_opaque(ctx, &()).ignore_annotations();
+        let enum_rust_ty =
+            item.to_rust_ty_or_opaque(ctx, &()).ignore_annotations();
         let is_toplevel = item.is_toplevel(ctx);
 
         // Used to mangle the constants we generate in the unnamed-enum case.
@@ -3109,8 +3183,8 @@ impl CodeGenerator for Enum {
 
                         let existing_variant_name = entry.get();
                         // Use associated constants for named enums.
-                        if enum_ty.name().is_some() &&
-                            ctx.options().rust_features().associated_const
+                        if enum_ty.name().is_some()
+                            && ctx.options().rust_features().associated_const
                         {
                             let enum_canonical_name = &ident;
                             let variant_name =
@@ -3158,8 +3232,8 @@ impl CodeGenerator for Enum {
                     // If it's an unnamed enum, or constification is enforced,
                     // we also generate a constant so it can be properly
                     // accessed.
-                    if (variation.is_rust() && enum_ty.name().is_none()) ||
-                        variant.force_constification()
+                    if (variation.is_rust() && enum_ty.name().is_none())
+                        || variant.force_constification()
                     {
                         let mangled_name = if is_toplevel {
                             variant_name.clone()
@@ -3426,11 +3500,7 @@ where
 {
     type Extra = E;
 
-    fn to_rust_ty_or_opaque(
-        &self,
-        ctx: &BindgenContext,
-        extra: &E,
-    ) -> RustTy {
+    fn to_rust_ty_or_opaque(&self, ctx: &BindgenContext, extra: &E) -> RustTy {
         self.try_to_rust_ty(ctx, extra)
             .unwrap_or_else(|_| self.to_opaque(ctx, extra).into())
     }
@@ -3527,38 +3597,42 @@ impl RustTy {
         }
     }
 
-    fn new_reference(ts: proc_macro2::TokenStream, inner: RustTyAnnotation) -> Self {
+    fn new_reference(
+        ts: proc_macro2::TokenStream,
+        inner: RustTyAnnotation,
+    ) -> Self {
         let annotation = match inner {
-            RustTyAnnotation::HasUnusedTemplateArgs => RustTyAnnotation::HasUnusedTemplateArgs,
-            _ => RustTyAnnotation::Reference
+            RustTyAnnotation::HasUnusedTemplateArgs => {
+                RustTyAnnotation::HasUnusedTemplateArgs
+            }
+            _ => RustTyAnnotation::Reference,
         };
-        Self {
-            ts,
-            annotation,
-        }
+        Self { ts, annotation }
     }
 
     // We're constructing some outer type composed of an inner type,
     // e.g. a reference to a T - the inner type is T
     fn wraps(ts: proc_macro2::TokenStream, inner: RustTyAnnotation) -> Self {
         let annotation = match inner {
-            RustTyAnnotation::HasUnusedTemplateArgs => RustTyAnnotation::HasUnusedTemplateArgs,
-            _ => RustTyAnnotation::None
+            RustTyAnnotation::HasUnusedTemplateArgs => {
+                RustTyAnnotation::HasUnusedTemplateArgs
+            }
+            _ => RustTyAnnotation::None,
         };
-        Self {
-            ts,
-            annotation,
-        }
+        Self { ts, annotation }
     }
 
-    fn with_unused_template_args(ts: proc_macro2::TokenStream, has_unused_args: bool) -> Self {
+    fn with_unused_template_args(
+        ts: proc_macro2::TokenStream,
+        has_unused_args: bool,
+    ) -> Self {
         Self {
             ts,
             annotation: if has_unused_args {
                 RustTyAnnotation::HasUnusedTemplateArgs
             } else {
                 RustTyAnnotation::None
-            }
+            },
         }
     }
 
@@ -3611,7 +3685,9 @@ impl TryToRustTy for Type {
                     IntKind::Long => Ok(raw_type(ctx, "c_long").into()),
                     IntKind::ULong => Ok(raw_type(ctx, "c_ulong").into()),
                     IntKind::LongLong => Ok(raw_type(ctx, "c_longlong").into()),
-                    IntKind::ULongLong => Ok(raw_type(ctx, "c_ulonglong").into()),
+                    IntKind::ULongLong => {
+                        Ok(raw_type(ctx, "c_ulonglong").into())
+                    }
                     IntKind::WChar => {
                         let layout = self
                             .layout(ctx)
@@ -3631,7 +3707,9 @@ impl TryToRustTy for Type {
                     IntKind::I64 => Ok(quote! { i64 }.into()),
                     IntKind::U64 => Ok(quote! { u64 }.into()),
                     IntKind::Custom { name, .. } => {
-                        Ok(proc_macro2::TokenStream::from_str(name).unwrap().into())
+                        Ok(proc_macro2::TokenStream::from_str(name)
+                            .unwrap()
+                            .into())
                     }
                     IntKind::U128 => {
                         Ok(if ctx.options().rust_features.i128_and_u128 {
@@ -3640,14 +3718,16 @@ impl TryToRustTy for Type {
                             // Best effort thing, but wrong alignment
                             // unfortunately.
                             quote! { [u64; 2] }
-                        }.into())
+                        }
+                        .into())
                     }
                     IntKind::I128 => {
                         Ok(if ctx.options().rust_features.i128_and_u128 {
                             quote! { i128 }
                         } else {
                             quote! { [u64; 2] }
-                        }.into())
+                        }
+                        .into())
                     }
                 }
             }
@@ -3667,7 +3747,8 @@ impl TryToRustTy for Type {
                     quote! {
                         __BindgenComplex<#float_path>
                     }
-                }.into())
+                }
+                .into())
             }
             TypeKind::Function(ref fs) => {
                 // We can't rely on the sizeof(Option<NonZero<_>>) ==
@@ -3679,13 +3760,15 @@ impl TryToRustTy for Type {
                 let prefix = ctx.trait_prefix();
                 Ok(quote! {
                     ::#prefix::option::Option<#ty>
-                }.into())
+                }
+                .into())
             }
             TypeKind::Array(item, len) | TypeKind::Vector(item, len) => {
                 let ty = item.try_to_rust_ty(ctx, &())?.to_unannotated_ts()?;
                 Ok(quote! {
                     [ #ty ; #len ]
-                }.into())
+                }
+                .into())
             }
             TypeKind::Enum(..) => {
                 let path = item.namespace_aware_canonical_path(ctx);
@@ -3697,9 +3780,9 @@ impl TryToRustTy for Type {
                 inst.try_to_rust_ty(ctx, item)
             }
             TypeKind::ResolvedTypeRef(inner) => inner.try_to_rust_ty(ctx, &()),
-            TypeKind::TemplateAlias(..) |
-            TypeKind::Alias(..) |
-            TypeKind::BlockPointer(..) => {
+            TypeKind::TemplateAlias(..)
+            | TypeKind::Alias(..)
+            | TypeKind::BlockPointer(..) => {
                 if self.is_block_pointer() && !ctx.options().generate_block {
                     let void = c_void(ctx);
                     return Ok(void.to_ptr(/* is_const = */ false).into());
@@ -3723,8 +3806,8 @@ impl TryToRustTy for Type {
             }
             TypeKind::Comp(ref info) => {
                 let template_params = item.all_template_params(ctx);
-                if info.has_non_type_template_params() ||
-                    (item.is_opaque(ctx, &()) && !template_params.is_empty())
+                if info.has_non_type_template_params()
+                    || (item.is_opaque(ctx, &()) && !template_params.is_empty())
                 {
                     return Ok(self.try_to_opaque(ctx, item)?.into());
                 }
@@ -3734,7 +3817,8 @@ impl TryToRustTy for Type {
             TypeKind::Opaque => self.try_to_opaque(ctx, item),
             TypeKind::Pointer(inner) | TypeKind::Reference(inner) => {
                 let is_const = ctx.resolve_type(inner).is_const();
-                let is_reference = matches!(self.kind(), TypeKind::Reference(_));
+                let is_reference =
+                    matches!(self.kind(), TypeKind::Reference(_));
 
                 let inner =
                     inner.into_resolver().through_type_refs().resolve(ctx);
@@ -3748,7 +3832,8 @@ impl TryToRustTy for Type {
                 // Regardless if we can properly represent the inner type, we
                 // should always generate a proper pointer here, so use
                 // infallible conversion of the inner type.
-                let (mut ty, inner_annotations) = inner.to_rust_ty_or_opaque(ctx, &()).to_outer_type();
+                let (mut ty, inner_annotations) =
+                    inner.to_rust_ty_or_opaque(ctx, &()).to_outer_type();
                 ty.append_implicit_template_params(ctx, inner);
 
                 // Avoid the first function pointer level, since it's already
@@ -3770,19 +3855,23 @@ impl TryToRustTy for Type {
                 let ident = ctx.rust_ident(&name);
                 Ok(quote! {
                     #ident
-                }.into())
+                }
+                .into())
             }
             TypeKind::ObjCSel => Ok(quote! {
                 objc::runtime::Sel
-            }.into()),
+            }
+            .into()),
             TypeKind::ObjCId => Ok(quote! {
                 id
-            }.into()),
+            }
+            .into()),
             TypeKind::ObjCInterface(ref interface) => {
                 let name = ctx.rust_ident(interface.name());
                 Ok(quote! {
                     #name
-                }.into())
+                }
+                .into())
             }
             ref u @ TypeKind::UnresolvedTypeRef(..) => {
                 unreachable!("Should have been resolved after parsing {:?}!", u)
@@ -3856,24 +3945,32 @@ impl TryToRustTy for TemplateInstantiation {
             .filter(|&(_, param)| ctx.uses_template_parameter(def.id(), *param))
             .map(|(arg, _)| {
                 let arg = arg.into_resolver().through_type_refs().resolve(ctx);
-                let mut ty = arg.try_to_rust_ty(ctx, &())?.to_unannotated_ts()?;
+                let mut ty =
+                    arg.try_to_rust_ty(ctx, &())?.to_unannotated_ts()?;
                 ty.append_implicit_template_params(ctx, arg);
                 Ok(ty)
             })
             .collect::<error::Result<Vec<_>>>()?;
 
-        let has_unused_template_args = def_params.iter()
+        let has_unused_template_args = def_params
+            .iter()
             // Only pass type arguments for the type parameters that
             // the def uses.
             .any(|param| !ctx.uses_template_parameter(def.id(), *param));
 
         if template_args.is_empty() {
-            return Ok(RustTy::with_unused_template_args(ty, has_unused_template_args));
+            return Ok(RustTy::with_unused_template_args(
+                ty,
+                has_unused_template_args,
+            ));
         }
 
-        Ok(RustTy::with_unused_template_args(quote! {
-            #ty < #( #template_args ),* >
-        }, has_unused_template_args))
+        Ok(RustTy::with_unused_template_args(
+            quote! {
+                #ty < #( #template_args ),* >
+            },
+            has_unused_template_args,
+        ))
     }
 }
 
@@ -3897,7 +3994,8 @@ impl TryToRustTy for FunctionSig {
             }
             _ => Ok(quote! {
                 unsafe extern #abi fn ( #( #arguments ),* ) #ret
-            }.into()),
+            }
+            .into()),
         }
     }
 }
@@ -3929,8 +4027,11 @@ impl CodeGenerator for Function {
         // something meaningful for them.
         let is_pure_virtual = match self.kind() {
             FunctionKind::Method(ref method_kind)
-                if method_kind.is_pure_virtual() => true,
-            _ => false
+                if method_kind.is_pure_virtual() =>
+            {
+                true
+            }
+            _ => false,
         };
 
         // Similar to static member variables in a class template, we can't
@@ -3969,8 +4070,8 @@ impl CodeGenerator for Function {
         let mut attributes = args_attrs;
         attributes.push(ret_attr);
 
-        if signature.must_use() &&
-            ctx.options().rust_features().must_use_function
+        if signature.must_use()
+            && ctx.options().rust_features().must_use_function
         {
             attributes.push(attributes::must_use());
         }
@@ -4042,15 +4143,17 @@ impl CodeGenerator for Function {
         };
 
         // If we're doing dynamic binding generation, add to the dynamic items.
-        if ctx.options().dynamic_library_name.is_some() &&
-            self.kind() == FunctionKind::Function
+        if ctx.options().dynamic_library_name.is_some()
+            && self.kind() == FunctionKind::Function
         {
             let args_identifiers =
                 utils::fnsig_argument_identifiers(ctx, signature);
             let return_item = ctx.resolve_item(signature.return_type());
             let ret_ty = match *return_item.kind().expect_type().kind() {
                 TypeKind::Void => quote! {()},
-                _ => return_item.to_rust_ty_or_opaque(ctx, &()).ignore_annotations(),
+                _ => return_item
+                    .to_rust_ty_or_opaque(ctx, &())
+                    .ignore_annotations(),
             };
             result.dynamic_items().push(
                 ident,
@@ -4379,7 +4482,9 @@ pub(crate) fn codegen(
 }
 
 pub mod utils {
-    use super::{RustTy, RustTyAnnotation, ToRustTyOrOpaque, error, helpers::attributes};
+    use super::{
+        error, helpers::attributes, RustTy, RustTyAnnotation, ToRustTyOrOpaque,
+    };
     use crate::ir::context::BindgenContext;
     use crate::ir::function::{Abi, FunctionSig};
     use crate::ir::item::{Item, ItemCanonicalPath};
@@ -4701,7 +4806,7 @@ pub mod utils {
     ) -> (proc_macro2::TokenStream, proc_macro2::TokenStream) {
         let return_item = ctx.resolve_item(sig.return_type());
         if let TypeKind::Void = *return_item.kind().expect_type().kind() {
-            (quote! {}, quote!{})
+            (quote! {}, quote! {})
         } else {
             let ret_ty = return_item.to_rust_ty_or_opaque(ctx, &());
             let annotations = ret_ty.annotation;
@@ -4709,11 +4814,18 @@ pub mod utils {
             let ts = quote! {
                 -> #ret_ty
             };
-            (ts, match annotations {
-                super::RustTyAnnotation::None => quote! {},
-                super::RustTyAnnotation::Reference => attributes::ret_type_reference(),
-                super::RustTyAnnotation::HasUnusedTemplateArgs => attributes::unused_template_param_in_arg_or_return(),
-            })
+            (
+                ts,
+                match annotations {
+                    super::RustTyAnnotation::None => quote! {},
+                    super::RustTyAnnotation::Reference => {
+                        attributes::ret_type_reference()
+                    }
+                    super::RustTyAnnotation::HasUnusedTemplateArgs => {
+                        attributes::unused_template_param_in_arg_or_return()
+                    }
+                },
+            )
         }
     }
 
@@ -4748,7 +4860,10 @@ pub mod utils {
                                 t.to_rust_ty_or_opaque(ctx, &())
                             };
                         let (inner_ty, annotations) = rust_ty.to_outer_type();
-                        RustTy::wraps(inner_ty.to_ptr(ctx.resolve_type(t).is_const()), annotations)
+                        RustTy::wraps(
+                            inner_ty.to_ptr(ctx.resolve_type(t).is_const()),
+                            annotations,
+                        )
                     }
                     TypeKind::Pointer(inner) => {
                         let inner = ctx.resolve_item(inner);
@@ -4780,19 +4895,26 @@ pub mod utils {
                 let arg_name = ctx.rust_ident(arg_name);
                 let arg_attr = match arg_details.annotation {
                     RustTyAnnotation::None => quote! {},
-                    RustTyAnnotation::Reference => attributes::arg_type_reference(&arg_name),
-                    RustTyAnnotation::HasUnusedTemplateArgs => attributes::unused_template_param_in_arg_or_return(),
+                    RustTyAnnotation::Reference => {
+                        attributes::arg_type_reference(&arg_name)
+                    }
+                    RustTyAnnotation::HasUnusedTemplateArgs => {
+                        attributes::unused_template_param_in_arg_or_return()
+                    }
                 };
 
-                (quote! {
-                    #arg_name : #arg_ty
-                }, arg_attr)
+                (
+                    quote! {
+                        #arg_name : #arg_ty
+                    },
+                    arg_attr,
+                )
             })
             .unzip();
 
         if sig.is_variadic() {
             args.0.push(quote! { ... });
-            args.1.push(quote! { });
+            args.1.push(quote! {});
         }
 
         args
@@ -4842,7 +4964,9 @@ pub mod utils {
             if let TypeKind::Void = *return_item.kind().expect_type().kind() {
                 quote! { () }
             } else {
-                return_item.to_rust_ty_or_opaque(ctx, &()).ignore_annotations()
+                return_item
+                    .to_rust_ty_or_opaque(ctx, &())
+                    .ignore_annotations()
             };
 
         quote! {

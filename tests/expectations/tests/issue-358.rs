@@ -13,7 +13,11 @@ pub struct JS_PersistentRooted {
 }
 impl Default for JS_PersistentRooted {
     fn default() -> Self {
-        unsafe { ::std::mem::zeroed() }
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
     }
 }
 #[repr(C)]
@@ -23,6 +27,10 @@ pub struct a {
 }
 impl Default for a {
     fn default() -> Self {
-        unsafe { ::std::mem::zeroed() }
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
     }
 }

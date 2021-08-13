@@ -317,6 +317,7 @@ impl Builder {
             (&self.options.no_debug_types, "--no-debug"),
             (&self.options.no_default_types, "--no-default"),
             (&self.options.no_hash_types, "--no-hash"),
+            (&self.options.must_use_types, "--must-use-type"),
         ];
 
         for (set, flag) in regex_sets {
@@ -560,6 +561,10 @@ impl Builder {
 
         if self.options.c_naming {
             output_vector.push("--c-naming".into());
+        }
+
+        if self.options.force_explicit_padding {
+            output_vector.push("--explicit-padding".into());
         }
 
         // Add clang arguments
@@ -1419,6 +1424,17 @@ impl Builder {
         self
     }
 
+    /// If true, always emit explicit padding fields.
+    ///
+    /// If a struct needs to be serialized in its native format (padding bytes
+    /// and all), for example writing it to a file or sending it on the network,
+    /// then this should be enabled, as anything reading the padding bytes of
+    /// a struct may lead to Undefined Behavior.
+    pub fn explicit_padding(mut self, doit: bool) -> Self {
+        self.options.force_explicit_padding = doit;
+        self
+    }
+
     /// Generate the Rust bindings using the options built up thus far.
     pub fn generate(mut self) -> Result<Bindings, ()> {
         // Add any extra arguments from the environment to the clang command line.
@@ -1570,6 +1586,13 @@ impl Builder {
     /// expressions are supported.
     pub fn no_hash<T: Into<String>>(mut self, arg: T) -> Builder {
         self.options.no_hash_types.insert(arg.into());
+        self
+    }
+
+    /// Add `#[must_use]` for the given type. Regular
+    /// expressions are supported.
+    pub fn must_use_type<T: Into<String>>(mut self, arg: T) -> Builder {
+        self.options.must_use_types.insert(arg.into());
         self
     }
 
@@ -1913,6 +1936,9 @@ struct BindgenOptions {
     /// The set of types that we should not derive `Hash` for.
     no_hash_types: RegexSet,
 
+    /// The set of types that we should be annotated with `#[must_use]`.
+    must_use_types: RegexSet,
+
     /// Decide if C arrays should be regular pointers in rust or array pointers
     array_pointers_in_arguments: bool,
 
@@ -1937,6 +1963,9 @@ struct BindgenOptions {
 
     /// Generate types with C style naming.
     c_naming: bool,
+
+    /// Always output explicit padding fields
+    force_explicit_padding: bool,
 }
 
 /// TODO(emilio): This is sort of a lie (see the error message that results from
@@ -1968,6 +1997,7 @@ impl BindgenOptions {
             &mut self.no_debug_types,
             &mut self.no_default_types,
             &mut self.no_hash_types,
+            &mut self.must_use_types,
         ];
         let record_matches = self.record_matches;
         for regex_set in &mut regex_sets {
@@ -2072,6 +2102,7 @@ impl Default for BindgenOptions {
             no_debug_types: Default::default(),
             no_default_types: Default::default(),
             no_hash_types: Default::default(),
+            must_use_types: Default::default(),
             array_pointers_in_arguments: false,
             wasm_import_module_name: None,
             dynamic_library_name: None,
@@ -2079,6 +2110,7 @@ impl Default for BindgenOptions {
             respect_cxx_access_specs: false,
             translate_enum_integer_types: false,
             c_naming: false,
+            force_explicit_padding: false,
         }
     }
 }

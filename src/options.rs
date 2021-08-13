@@ -487,6 +487,13 @@ where
                 .takes_value(true)
                 .multiple(true)
                 .number_of_values(1),
+            Arg::with_name("must-use-type")
+                .long("must-use-type")
+                .help("Add #[must_use] annotation to types matching <regex>.")
+                .value_name("regex")
+                .takes_value(true)
+                .multiple(true)
+                .number_of_values(1),
             Arg::with_name("enable-function-attribute-detection")
                 .long("enable-function-attribute-detection")
                 .help(
@@ -517,6 +524,9 @@ where
             Arg::with_name("c-naming")
                 .long("c-naming")
                 .help("Generate types with C style naming."),
+            Arg::with_name("explicit-padding")
+                .long("explicit-padding")
+                .help("Always output explicit padding fields."),
         ]) // .args()
         .get_matches_from(args);
 
@@ -941,6 +951,12 @@ where
         }
     }
 
+    if let Some(must_use_type) = matches.values_of("must-use-type") {
+        for regex in must_use_type {
+            builder = builder.must_use_type(regex);
+        }
+    }
+
     if let Some(dynamic_library_name) = matches.value_of("dynamic-loading") {
         builder = builder.dynamic_library_name(dynamic_library_name);
     }
@@ -959,6 +975,10 @@ where
 
     if matches.is_present("c-naming") {
         builder = builder.c_naming(true);
+    }
+
+    if matches.is_present("explicit-padding") {
+        builder = builder.explicit_padding(true);
     }
 
     let verbose = matches.is_present("verbose");

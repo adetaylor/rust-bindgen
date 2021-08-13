@@ -69,7 +69,11 @@ pub struct basic_string___long {
 }
 impl Default for basic_string___long {
     fn default() -> Self {
-        unsafe { ::std::mem::zeroed() }
+        unsafe {
+            let mut s: Self = ::std::mem::uninitialized();
+            ::std::ptr::write_bytes(&mut s, 0, 1);
+            s
+        }
     }
 }
 pub const basic_string___min_cap: basic_string__bindgen_ty_1 =
@@ -95,7 +99,11 @@ pub struct basic_string___short__bindgen_ty_1 {
 }
 impl Default for basic_string___short {
     fn default() -> Self {
-        unsafe { ::std::mem::zeroed() }
+        unsafe {
+            let mut s: Self = ::std::mem::uninitialized();
+            ::std::ptr::write_bytes(&mut s, 0, 1);
+            s
+        }
     }
 }
 #[repr(C)]
@@ -121,7 +129,11 @@ pub struct basic_string___raw {
 }
 impl Default for basic_string___raw {
     fn default() -> Self {
-        unsafe { ::std::mem::zeroed() }
+        unsafe {
+            let mut s: Self = ::std::mem::uninitialized();
+            ::std::ptr::write_bytes(&mut s, 0, 1);
+            s
+        }
     }
 }
 #[repr(C)]

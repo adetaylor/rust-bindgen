@@ -57,7 +57,11 @@ pub struct StylePoint<T> {
 }
 impl<T> Default for StylePoint<T> {
     fn default() -> Self {
-        unsafe { ::std::mem::zeroed() }
+        unsafe {
+            let mut s: Self = ::std::mem::uninitialized();
+            ::std::ptr::write_bytes(&mut s, 0, 1);
+            s
+        }
     }
 }
 #[repr(C)]
@@ -88,7 +92,11 @@ pub struct StyleFoo_Foo_Body<T> {
 }
 impl<T> Default for StyleFoo_Foo_Body<T> {
     fn default() -> Self {
-        unsafe { ::std::mem::zeroed() }
+        unsafe {
+            let mut s: Self = ::std::mem::uninitialized();
+            ::std::ptr::write_bytes(&mut s, 0, 1);
+            s
+        }
     }
 }
 #[repr(C)]
@@ -101,7 +109,11 @@ pub struct StyleFoo_Bar_Body<T> {
 }
 impl<T> Default for StyleFoo_Bar_Body<T> {
     fn default() -> Self {
-        unsafe { ::std::mem::zeroed() }
+        unsafe {
+            let mut s: Self = ::std::mem::uninitialized();
+            ::std::ptr::write_bytes(&mut s, 0, 1);
+            s
+        }
     }
 }
 #[repr(C)]
@@ -114,7 +126,11 @@ pub struct StyleFoo_Baz_Body<T> {
 }
 impl<T> Default for StyleFoo_Baz_Body<T> {
     fn default() -> Self {
-        unsafe { ::std::mem::zeroed() }
+        unsafe {
+            let mut s: Self = ::std::mem::uninitialized();
+            ::std::ptr::write_bytes(&mut s, 0, 1);
+            s
+        }
     }
 }
 #[repr(C)]
@@ -124,7 +140,11 @@ pub struct StyleFoo__bindgen_ty_1 {
 }
 impl Default for StyleFoo__bindgen_ty_1 {
     fn default() -> Self {
-        unsafe { ::std::mem::zeroed() }
+        unsafe {
+            let mut s: Self = ::std::mem::uninitialized();
+            ::std::ptr::write_bytes(&mut s, 0, 1);
+            s
+        }
     }
 }
 #[repr(C)]
@@ -151,7 +171,11 @@ pub struct StyleBar_StyleBar1_Body<T> {
 }
 impl<T> Default for StyleBar_StyleBar1_Body<T> {
     fn default() -> Self {
-        unsafe { ::std::mem::zeroed() }
+        unsafe {
+            let mut s: Self = ::std::mem::uninitialized();
+            ::std::ptr::write_bytes(&mut s, 0, 1);
+            s
+        }
     }
 }
 #[repr(C)]
@@ -163,7 +187,11 @@ pub struct StyleBar_StyleBar2_Body<T> {
 }
 impl<T> Default for StyleBar_StyleBar2_Body<T> {
     fn default() -> Self {
-        unsafe { ::std::mem::zeroed() }
+        unsafe {
+            let mut s: Self = ::std::mem::uninitialized();
+            ::std::ptr::write_bytes(&mut s, 0, 1);
+            s
+        }
     }
 }
 #[repr(C)]
@@ -175,7 +203,11 @@ pub struct StyleBar_StyleBar3_Body<T> {
 }
 impl<T> Default for StyleBar_StyleBar3_Body<T> {
     fn default() -> Self {
-        unsafe { ::std::mem::zeroed() }
+        unsafe {
+            let mut s: Self = ::std::mem::uninitialized();
+            ::std::ptr::write_bytes(&mut s, 0, 1);
+            s
+        }
     }
 }
 #[repr(C)]
@@ -189,7 +221,11 @@ pub struct StyleBar__bindgen_ty_1<T> {
 }
 impl<T> Default for StyleBar<T> {
     fn default() -> Self {
-        unsafe { ::std::mem::zeroed() }
+        unsafe {
+            let mut s: Self = ::std::mem::uninitialized();
+            ::std::ptr::write_bytes(&mut s, 0, 1);
+            s
+        }
     }
 }
 #[test]
