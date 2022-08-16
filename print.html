@@ -201,19 +201,8 @@ extern &quot;C&quot; {
 <h2><a class="header" href="#clang" id="clang">Clang</a></h2>
 <p><code>bindgen</code> leverages <code>libclang</code> to preprocess, parse, and type check C and C++
 header files.</p>
-<p>It is recommended to use Clang 3.9 or greater, however <code>bindgen</code> can run with
-older Clangs with some features disabled.</p>
-<ul>
-<li>
-<p><strong>If you are generating bindings to C,</strong> 3.7 and 3.8 will probably work OK for
-you.</p>
-</li>
-<li>
-<p><strong>If you are generating bindings to C++,</strong> you almost definitely want 3.9 or
-greater.</p>
-</li>
-</ul>
-<h3><a class="header" href="#installing-clang-39" id="installing-clang-39">Installing Clang 3.9</a></h3>
+<p>It is required to use Clang 5.0 or greater.</p>
+<h3><a class="header" href="#installing-clang" id="installing-clang">Installing Clang</a></h3>
 <h4><a class="header" href="#windows" id="windows">Windows</a></h4>
 <p>Download and install the official pre-built binary from
 <a href="http://releases.llvm.org/download.html">LLVM download page</a>.</p>
@@ -234,9 +223,7 @@ to <code>D:\programs\LLVM</code>, then you'd set the value to be <code>D:\progra
 <h4><a class="header" href="#debian-based-linuxes" id="debian-based-linuxes">Debian-based Linuxes</a></h4>
 <pre><code class="language-bash"># apt install llvm-dev libclang-dev clang
 </code></pre>
-<p>Ubuntu 16.10 provides the necessary packages directly. If you are using older
-version of Ubuntu or other Debian-based distros, you may need to add the LLVM
-repos to get version 3.9. See http://apt.llvm.org/.</p>
+<p>Ubuntu 18.04 provides the necessary packages directly.</p>
 <h4><a class="header" href="#arch" id="arch">Arch</a></h4>
 <pre><code class="language-bash"># pacman -S clang
 </code></pre>
@@ -248,7 +235,7 @@ repos to get version 3.9. See http://apt.llvm.org/.</p>
 </code></pre>
 <p>Add <code>export LIBCLANG_PATH=/usr/local/lib</code> to your profile.</p>
 <h4><a class="header" href="#from-source" id="from-source">From source</a></h4>
-<p>If your package manager doesn't yet offer Clang 3.9, you'll need to build from
+<p>If your package manager doesn't yet offer Clang 5.0, you'll need to build from
 source. For that, follow the
 instructions <a href="http://clang.llvm.org/get_started.html">here</a>.</p>
 <p>Those instructions list optional steps. For <code>bindgen</code>:</p>
@@ -311,12 +298,16 @@ And of course in our case, we will be generating Rust FFI
 bindings to <code>bzip2</code> at compile time. The resulting bindings will be written to
 <code>$OUT_DIR/bindings.rs</code> where <code>$OUT_DIR</code> is chosen by <code>cargo</code> and is something
 like <code>./target/debug/build/bindgen-tutorial-bzip2-sys-afc7747d7eafd720/out/</code>.</p>
+<p>Note that the associated shared object to <code>bz2</code> is <code>libbz2.so</code>. In general, a <code>lib&lt;name&gt;.so</code> should be referenced in the build file by <code>&lt;name&gt;</code>.</p>
 <pre><code class="language-rust ignore">extern crate bindgen;
 
 use std::env;
 use std::path::PathBuf;
 
 fn main() {
+    // Tell cargo to look for shared libraries in the specified directory
+    println!(&quot;cargo:rustc-link-search=/path/to/lib&quot;);
+
     // Tell cargo to tell rustc to link the system bzip2
     // shared library.
     println!(&quot;cargo:rustc-link-lib=bz2&quot;);
@@ -457,7 +448,7 @@ mod tests {
             // Finish the compression stream.
             let result = BZ2_bzCompressEnd(&amp;mut stream as *mut _);
             match result {
-                r if r == (BZ_PARAM_ERROR as _) =&gt; panic!(BZ_PARAM_ERROR),
+                r if r == (BZ_PARAM_ERROR as _) =&gt; panic!(&quot;BZ_PARAM_ERROR&quot;),
                 r if r == (BZ_OK as _) =&gt; {},
                 r =&gt; panic!(&quot;Unknown return value = {}&quot;, r),
             }
@@ -636,12 +627,14 @@ transitively used by a definition that matches them.</p>
 <li><a href="https://docs.rs/bindgen/latest/bindgen/struct.Builder.html#method.allowlist_type"><code>bindgen::Builder::allowlist_type</code></a></li>
 <li><a href="https://docs.rs/bindgen/latest/bindgen/struct.Builder.html#method.allowlist_function"><code>bindgen::Builder::allowlist_function</code></a></li>
 <li><a href="https://docs.rs/bindgen/latest/bindgen/struct.Builder.html#method.allowlist_var"><code>bindgen::Builder::allowlist_var</code></a></li>
+<li><a href="https://docs.rs/bindgen/latest/bindgen/struct.Builder.html#method.allowlist_file"><code>bindgen::Builder::allowlist_file</code></a></li>
 </ul>
 <h3><a class="header" href="#command-line" id="command-line">Command Line</a></h3>
 <ul>
 <li><code>--allowlist-type &lt;type&gt;</code></li>
 <li><code>--allowlist-function &lt;function&gt;</code></li>
 <li><code>--allowlist-var &lt;var&gt;</code></li>
+<li><code>--allowlist-file &lt;path&gt;</code></li>
 </ul>
 <h3><a class="header" href="#annotations" id="annotations">Annotations</a></h3>
 <p>None.</p>
