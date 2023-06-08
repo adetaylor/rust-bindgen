@@ -924,7 +924,7 @@ impl CodeGenerator for Type {
                     // on our layout if converting the inner item fails.
                     let (mut inner_ty, _) = inner_item
                         .try_to_rust_ty_or_opaque(ctx, &())
-                        .map(|ty| ty.to_outer_type())
+                        .map(|ty| ty.into_outer_type())
                         .unwrap_or_else(|_| {
                             (self.to_opaque(ctx, item), RustTyAnnotation::None)
                         });
@@ -1435,7 +1435,7 @@ impl<'a> FieldCodegen<'a> for FieldData {
             self.ty().into_resolver().through_type_refs().resolve(ctx);
         let field_ty = field_item.expect_type();
         let ty = self.ty().to_rust_ty_or_opaque(ctx, &());
-        let (mut ty, ty_annotations) = ty.to_outer_type();
+        let (mut ty, ty_annotations) = ty.into_outer_type();
         ty.append_implicit_template_params(ctx, field_item);
 
         // NB: If supported, we use proper `union` types.
@@ -3983,11 +3983,11 @@ impl RustTy {
 
     // Use when this is an inner type and will become part of an outer type.
     // Pass the annotation into [wraps]
-    fn to_outer_type(self) -> (proc_macro2::TokenStream, RustTyAnnotation) {
+    fn into_outer_type(self) -> (proc_macro2::TokenStream, RustTyAnnotation) {
         (self.ts, self.annotation)
     }
 
-    fn to_unannotated_ts(self) -> error::Result<proc_macro2::TokenStream> {
+    fn into_unannotated_ts(self) -> error::Result<proc_macro2::TokenStream> {
         if matches!(self.annotation, RustTyAnnotation::None) {
             Ok(self.ts)
         } else {
@@ -4095,7 +4095,7 @@ impl TryToRustTy for Type {
                 // sizeof(NonZero<_>) optimization with opaque blobs (because
                 // they aren't NonZero), so don't *ever* use an or_opaque
                 // variant here.
-                let ty = fs.try_to_rust_ty(ctx, &())?.to_unannotated_ts()?;
+                let ty = fs.try_to_rust_ty(ctx, &())?.into_unannotated_ts()?;
 
                 let prefix = ctx.trait_prefix();
                 Ok(quote! {
@@ -4104,7 +4104,8 @@ impl TryToRustTy for Type {
                 .into())
             }
             TypeKind::Array(item, len) | TypeKind::Vector(item, len) => {
-                let ty = item.try_to_rust_ty(ctx, &())?.to_unannotated_ts()?;
+                let ty =
+                    item.try_to_rust_ty(ctx, &())?.into_unannotated_ts()?;
                 Ok(quote! {
                     [ #ty ; #len ]
                 }
@@ -4148,7 +4149,7 @@ impl TryToRustTy for Type {
                 if info.has_non_type_template_params() ||
                     (item.is_opaque(ctx, &()) && !template_params.is_empty())
                 {
-                    return Ok(self.try_to_opaque(ctx, item)?);
+                    return self.try_to_opaque(ctx, item);
                 }
 
                 Ok(utils::build_path(item, ctx)?.into())
@@ -4172,7 +4173,7 @@ impl TryToRustTy for Type {
                 // should always generate a proper pointer here, so use
                 // infallible conversion of the inner type.
                 let (mut ty, inner_annotations) =
-                    inner.to_rust_ty_or_opaque(ctx, &()).to_outer_type();
+                    inner.to_rust_ty_or_opaque(ctx, &()).into_outer_type();
                 ty.append_implicit_template_params(ctx, inner);
 
                 // Avoid the first function pointer level, since it's already
@@ -4287,7 +4288,7 @@ impl TryToRustTy for TemplateInstantiation {
             .map(|(arg, _)| {
                 let arg = arg.into_resolver().through_type_refs().resolve(ctx);
                 let mut ty =
-                    arg.try_to_rust_ty(ctx, &())?.to_unannotated_ts()?;
+                    arg.try_to_rust_ty(ctx, &())?.into_unannotated_ts()?;
                 ty.append_implicit_template_params(ctx, arg);
                 Ok(ty)
             })
@@ -5492,7 +5493,7 @@ pub(crate) mod utils {
                             } else {
                                 t.to_rust_ty_or_opaque(ctx, &())
                             };
-                        let (inner_ty, annotations) = rust_ty.to_outer_type();
+                        let (inner_ty, annotations) = rust_ty.into_outer_type();
                         RustTy::wraps(
                             inner_ty.to_ptr(ctx.resolve_type(t).is_const()),
                             annotations,

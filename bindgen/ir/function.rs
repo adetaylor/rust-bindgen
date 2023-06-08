@@ -92,6 +92,55 @@ impl From<CX_CXXAccessSpecifier> for Visibility {
     }
 }
 
+/// Autocxx specialized function information
+#[derive(Debug)]
+pub(crate) struct AutocxxFuncInfo {
+    /// C++ Special member kind, if applicable
+    special_member: Option<SpecialMemberKind>,
+    /// Whether it is private
+    visibility: Visibility,
+    /// =delete
+    is_deleted: bool,
+    /// =default
+    is_defaulted: bool,
+}
+
+impl AutocxxFuncInfo {
+    fn new(
+        special_member: Option<SpecialMemberKind>,
+        visibility: Visibility,
+        is_deleted: bool,
+        is_defaulted: bool,
+    ) -> Self {
+        Self {
+            special_member,
+            visibility,
+            is_deleted,
+            is_defaulted,
+        }
+    }
+
+    /// Get this function's C++ special member kind.
+    pub fn special_member(&self) -> Option<SpecialMemberKind> {
+        self.special_member
+    }
+
+    /// Whether it is private
+    pub fn visibility(&self) -> Visibility {
+        self.visibility
+    }
+
+    /// Whether this is a function that's been deleted (=delete)
+    pub fn deleted_fn(&self) -> bool {
+        self.is_deleted
+    }
+
+    /// Whether this is a function that's been deleted (=default)
+    pub fn defaulted_fn(&self) -> bool {
+        self.is_defaulted
+    }
+}
+
 /// A function declaration, with a signature, arguments, and argument names.
 ///
 /// The argument names vector must be the same length as the ones in the
@@ -116,17 +165,8 @@ pub(crate) struct Function {
     /// The linkage of the function.
     linkage: Linkage,
 
-    /// C++ special member kind, if any.
-    special_member: Option<SpecialMemberKind>,
-
-    /// C++ visibility
-    visibility: Visibility,
-
-    /// Whether it's deleted (=delete)
-    is_deleted: bool,
-
-    /// Whether it's explicitly defaulted (=default)
-    is_defaulted: bool,
+    /// Autocxx extension information
+    autocxx: AutocxxFuncInfo,
 }
 
 impl Function {
@@ -138,10 +178,7 @@ impl Function {
         signature: TypeId,
         kind: FunctionKind,
         linkage: Linkage,
-        special_member: Option<SpecialMemberKind>,
-        visibility: Visibility,
-        is_deleted: bool,
-        is_defaulted: bool,
+        autocxx: AutocxxFuncInfo,
     ) -> Self {
         Function {
             name,
@@ -150,10 +187,7 @@ impl Function {
             signature,
             kind,
             linkage,
-            special_member,
-            visibility,
-            is_deleted,
-            is_defaulted,
+            autocxx,
         }
     }
 
@@ -189,22 +223,22 @@ impl Function {
 
     /// Get this function's C++ special member kind.
     pub fn special_member(&self) -> Option<SpecialMemberKind> {
-        self.special_member
+        self.autocxx.special_member()
     }
 
     /// Whether it is private
     pub fn visibility(&self) -> Visibility {
-        self.visibility
+        self.autocxx.visibility()
     }
 
     /// Whether this is a function that's been deleted (=delete)
     pub fn deleted_fn(&self) -> bool {
-        self.is_deleted
+        self.autocxx.deleted_fn()
     }
 
-    /// Whether this is a function that's been deleted (=delete)
+    /// Whether this is a function that's been deleted (=default)
     pub fn defaulted_fn(&self) -> bool {
-        self.is_defaulted
+        self.autocxx.defaulted_fn()
     }
 }
 
@@ -840,6 +874,12 @@ impl ClangSubItemParser for Function {
             }
         });
 
+        let autocxx_info = AutocxxFuncInfo::new(
+            special_member,
+            visibility,
+            cursor.is_deleted_function(),
+            cursor.is_defaulted_function(),
+        );
         let function = Self::new(
             name,
             mangled_name,
@@ -847,10 +887,7 @@ impl ClangSubItemParser for Function {
             sig,
             kind,
             linkage,
-            special_member,
-            visibility,
-            cursor.is_deleted_function(),
-            cursor.is_defaulted_function(),
+            autocxx_info,
         );
 
         Ok(ParseResult::New(function, Some(cursor)))
