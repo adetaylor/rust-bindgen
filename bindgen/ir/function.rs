@@ -6,15 +6,13 @@ use super::dot::DotAttributes;
 use super::item::Item;
 use super::traversal::{EdgeKind, Trace, Tracer};
 use super::ty::TypeKind;
+use crate::callbacks::{ItemInfo, ItemKind};
 use crate::clang::{self, Attribute};
-use crate::parse::{
-    ClangItemParser, ClangSubItemParser, ParseError, ParseResult,
-};
+use crate::parse::{ClangSubItemParser, ParseError, ParseResult};
 use clang_sys::{
     self, CXCallingConv, CX_CXXAccessSpecifier, CX_CXXPrivate, CX_CXXProtected,
 };
-use proc_macro2;
-use quote;
+
 use quote::TokenStreamExt;
 use std::io;
 use std::str::FromStr;
@@ -23,7 +21,7 @@ const RUST_DERIVE_FUNPTR_LIMIT: usize = 12;
 
 /// What kind of a function are we looking at?
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum FunctionKind {
+pub(crate) enum FunctionKind {
     /// A plain, free function.
     Function,
     /// A method of some kind.
@@ -33,7 +31,7 @@ pub enum FunctionKind {
 impl FunctionKind {
     /// Given a clang cursor, return the kind of function it represents, or
     /// `None` otherwise.
-    pub fn from_cursor(cursor: &clang::Cursor) -> Option<FunctionKind> {
+    pub(crate) fn from_cursor(cursor: &clang::Cursor) -> Option<FunctionKind> {
         // FIXME(emilio): Deduplicate logic with `ir::comp`.
         Some(match cursor.kind() {
             clang_sys::CXCursor_FunctionDecl => FunctionKind::Function,
@@ -67,7 +65,7 @@ impl FunctionKind {
 
 /// The style of linkage
 #[derive(Debug, Clone, Copy)]
-pub enum Linkage {
+pub(crate) enum Linkage {
     /// Externally visible and can be linked against
     External,
     /// Not exposed externally. 'static inline' functions will have this kind of linkage
@@ -99,18 +97,18 @@ impl From<CX_CXXAccessSpecifier> for Visibility {
 /// The argument names vector must be the same length as the ones in the
 /// signature.
 #[derive(Debug)]
-pub struct Function {
+pub(crate) struct Function {
     /// The name of this function.
     name: String,
 
     /// The mangled name, that is, the symbol.
     mangled_name: Option<String>,
 
-    /// The id pointing to the current function signature.
-    signature: TypeId,
+    /// The link name. If specified, overwrite mangled_name.
+    link_name: Option<String>,
 
-    /// The doc comment on the function, if any.
-    comment: Option<String>,
+    /// The ID pointing to the current function signature.
+    signature: TypeId,
 
     /// The kind of function this is.
     kind: FunctionKind,
@@ -133,11 +131,11 @@ pub struct Function {
 
 impl Function {
     /// Construct a new function.
-    pub fn new(
+    pub(crate) fn new(
         name: String,
         mangled_name: Option<String>,
+        link_name: Option<String>,
         signature: TypeId,
-        comment: Option<String>,
         kind: FunctionKind,
         linkage: Linkage,
         special_member: Option<SpecialMemberKind>,
@@ -148,8 +146,8 @@ impl Function {
         Function {
             name,
             mangled_name,
+            link_name,
             signature,
-            comment,
             kind,
             linkage,
             special_member,
@@ -160,32 +158,32 @@ impl Function {
     }
 
     /// Get this function's name.
-    pub fn name(&self) -> &str {
+    pub(crate) fn name(&self) -> &str {
         &self.name
     }
 
     /// Get this function's name.
-    pub fn mangled_name(&self) -> Option<&str> {
+    pub(crate) fn mangled_name(&self) -> Option<&str> {
         self.mangled_name.as_deref()
     }
 
+    /// Get this function's link name.
+    pub fn link_name(&self) -> Option<&str> {
+        self.link_name.as_deref()
+    }
+
     /// Get this function's signature type.
-    pub fn signature(&self) -> TypeId {
+    pub(crate) fn signature(&self) -> TypeId {
         self.signature
     }
 
-    /// Get this function's comment.
-    pub fn comment(&self) -> Option<&str> {
-        self.comment.as_deref()
-    }
-
     /// Get this function's kind.
-    pub fn kind(&self) -> FunctionKind {
+    pub(crate) fn kind(&self) -> FunctionKind {
         self.kind
     }
 
     /// Get this function's linkage.
-    pub fn linkage(&self) -> Linkage {
+    pub(crate) fn linkage(&self) -> Linkage {
         self.linkage
     }
 
@@ -240,6 +238,8 @@ pub enum Abi {
     C,
     /// The "stdcall" ABI.
     Stdcall,
+    /// The "efiapi" ABI.
+    EfiApi,
     /// The "fastcall" ABI.
     Fastcall,
     /// The "thiscall" ABI.
@@ -250,6 +250,8 @@ pub enum Abi {
     Aapcs,
     /// The "win64" ABI.
     Win64,
+    /// The "C-unwind" ABI.
+    CUnwind,
 }
 
 impl FromStr for Abi {
@@ -259,11 +261,13 @@ impl FromStr for Abi {
         match s {
             "C" => Ok(Self::C),
             "stdcall" => Ok(Self::Stdcall),
+            "efiapi" => Ok(Self::EfiApi),
             "fastcall" => Ok(Self::Fastcall),
             "thiscall" => Ok(Self::ThisCall),
             "vectorcall" => Ok(Self::Vectorcall),
             "aapcs" => Ok(Self::Aapcs),
             "win64" => Ok(Self::Win64),
+            "C-unwind" => Ok(Self::CUnwind),
             _ => Err(format!("Invalid or unknown ABI {:?}", s)),
         }
     }
@@ -274,11 +278,13 @@ impl std::fmt::Display for Abi {
         let s = match *self {
             Self::C => "C",
             Self::Stdcall => "stdcall",
+            Self::EfiApi => "efiapi",
             Self::Fastcall => "fastcall",
             Self::ThisCall => "thiscall",
             Self::Vectorcall => "vectorcall",
             Self::Aapcs => "aapcs",
             Self::Win64 => "win64",
+            Self::CUnwind => "C-unwind",
         };
 
         s.fmt(f)
@@ -295,6 +301,7 @@ impl quote::ToTokens for Abi {
 /// An ABI extracted from a clang cursor.
 #[derive(Debug, Copy, Clone)]
 pub(crate) enum ClangAbi {
+    /// An ABI known by Rust.
     Known(Abi),
     /// An unknown or invalid ABI.
     Unknown(CXCallingConv),
@@ -321,7 +328,10 @@ impl quote::ToTokens for ClangAbi {
 
 /// A function signature.
 #[derive(Debug)]
-pub struct FunctionSig {
+pub(crate) struct FunctionSig {
+    /// The name of this function signature.
+    name: String,
+
     /// The return type of the function.
     return_type: TypeId,
 
@@ -356,7 +366,7 @@ fn get_abi(cc: CXCallingConv) -> ClangAbi {
 }
 
 /// Get the mangled name for the cursor's referent.
-pub fn cursor_mangling(
+pub(crate) fn cursor_mangling(
     ctx: &BindgenContext,
     cursor: &clang::Cursor,
 ) -> Option<String> {
@@ -458,7 +468,7 @@ fn args_from_ty_and_cursor(
 
 impl FunctionSig {
     /// Construct a new function signature from the given Clang type.
-    pub fn from_ty(
+    pub(crate) fn from_ty(
         ty: &clang::Type,
         cursor: &clang::Cursor,
         ctx: &mut BindgenContext,
@@ -625,7 +635,8 @@ impl FunctionSig {
             warn!("Unknown calling convention: {:?}", call_conv);
         }
 
-        Ok(FunctionSig {
+        Ok(Self {
+            name: spelling,
             return_type: ret,
             argument_types: args,
             is_variadic: ty.is_variadic(),
@@ -636,12 +647,12 @@ impl FunctionSig {
     }
 
     /// Get this function signature's return type.
-    pub fn return_type(&self) -> TypeId {
+    pub(crate) fn return_type(&self) -> TypeId {
         self.return_type
     }
 
     /// Get this function signature's argument (name, type) pairs.
-    pub fn argument_types(&self) -> &[(Option<String>, TypeId)] {
+    pub(crate) fn argument_types(&self) -> &[(Option<String>, TypeId)] {
         &self.argument_types
     }
 
@@ -664,13 +675,20 @@ impl FunctionSig {
             } else {
                 self.abi
             }
+        } else if let Some((abi, _)) = ctx
+            .options()
+            .abi_overrides
+            .iter()
+            .find(|(_, regex_set)| regex_set.matches(&self.name))
+        {
+            ClangAbi::Known(*abi)
         } else {
             self.abi
         }
     }
 
     /// Is this function signature variadic?
-    pub fn is_variadic(&self) -> bool {
+    pub(crate) fn is_variadic(&self) -> bool {
         // Clang reports some functions as variadic when they *might* be
         // variadic. We do the argument check because rust doesn't codegen well
         // variadic functions without an initial argument.
@@ -678,7 +696,7 @@ impl FunctionSig {
     }
 
     /// Must this function's return value be used?
-    pub fn must_use(&self) -> bool {
+    pub(crate) fn must_use(&self) -> bool {
         self.must_use
     }
 
@@ -688,10 +706,10 @@ impl FunctionSig {
     ///
     /// For more details, see:
     ///
-    /// * https://github.com/rust-lang/rust-bindgen/issues/547,
-    /// * https://github.com/rust-lang/rust/issues/38848,
-    /// * and https://github.com/rust-lang/rust/issues/40158
-    pub fn function_pointers_can_derive(&self) -> bool {
+    /// * <https://github.com/rust-lang/rust-bindgen/issues/547>,
+    /// * <https://github.com/rust-lang/rust/issues/38848>,
+    /// * and <https://github.com/rust-lang/rust/issues/40158>
+    pub(crate) fn function_pointers_can_derive(&self) -> bool {
         if self.argument_types.len() > RUST_DERIVE_FUNPTR_LIMIT {
             return false;
         }
@@ -699,6 +717,7 @@ impl FunctionSig {
         matches!(self.abi, ClangAbi::Known(Abi::C) | ClangAbi::Unknown(..))
     }
 
+    /// Whether this function has attributes marking it as divergent.
     pub(crate) fn is_divergent(&self) -> bool {
         self.is_divergent
     }
@@ -717,7 +736,6 @@ impl ClangSubItemParser for Function {
         };
 
         debug!("Function::parse({:?}, {:?})", cursor, cursor.cur_type());
-
         let visibility = cursor.visibility();
         if visibility != CXVisibility_Default {
             return Err(ParseError::Continue);
@@ -725,18 +743,32 @@ impl ClangSubItemParser for Function {
 
         let visibility = Visibility::from(cursor.access_specifier());
 
-        if cursor.is_inlined_function() {
-            if !context.options().generate_inline_functions {
-                return Err(ParseError::Continue);
-            }
-        }
-
         let linkage = cursor.linkage();
         let linkage = match linkage {
             CXLinkage_External | CXLinkage_UniqueExternal => Linkage::External,
             CXLinkage_Internal => Linkage::Internal,
             _ => return Err(ParseError::Continue),
         };
+
+        if cursor.is_inlined_function() ||
+            cursor
+                .definition()
+                .map_or(false, |x| x.is_inlined_function())
+        {
+            if !context.options().generate_inline_functions &&
+                !context.options().wrap_static_fns
+            {
+                return Err(ParseError::Continue);
+            }
+
+            // We cannot handle `inline` functions that are not `static`.
+            if context.options().wrap_static_fns &&
+                cursor.is_inlined_function() &&
+                matches!(linkage, Linkage::External)
+            {
+                return Err(ParseError::Continue);
+            }
+        }
 
         // Grab the signature using Item::from_ty.
         let sig = Item::from_ty(&cursor.cur_type(), cursor, None, context)?;
@@ -757,10 +789,12 @@ impl ClangSubItemParser for Function {
             // but seems easy enough to handle it here.
             name.push_str("_destructor");
         }
-        if let Some(nm) = context
-            .options()
-            .last_callback(|callbacks| callbacks.generated_name_override(&name))
-        {
+        if let Some(nm) = context.options().last_callback(|callbacks| {
+            callbacks.generated_name_override(ItemInfo {
+                name: name.as_str(),
+                kind: ItemKind::Function,
+            })
+        }) {
             name = nm;
         }
         assert!(!name.is_empty(), "Empty function name.");
@@ -783,8 +817,14 @@ impl ClangSubItemParser for Function {
             None
         };
 
+        let link_name = context.options().last_callback(|callbacks| {
+            callbacks.generated_link_name_override(ItemInfo {
+                name: name.as_str(),
+                kind: ItemKind::Function,
+            })
+        });
+
         let mangled_name = cursor_mangling(context, &cursor);
-        let comment = cursor.raw_comment();
 
         let special_member = special_member.or_else(|| {
             if cursor.is_default_constructor() {
@@ -803,8 +843,8 @@ impl ClangSubItemParser for Function {
         let function = Self::new(
             name,
             mangled_name,
+            link_name,
             sig,
-            comment,
             kind,
             linkage,
             special_member,
@@ -812,6 +852,7 @@ impl ClangSubItemParser for Function {
             cursor.is_deleted_function(),
             cursor.is_defaulted_function(),
         );
+
         Ok(ParseResult::New(function, Some(cursor)))
     }
 }

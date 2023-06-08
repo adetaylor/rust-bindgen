@@ -7,139 +7,156 @@
   - [Removed](#removed)
   - [Fixed](#fixed)
   - [Security](#security)
-- [0.61.0](#0610)
+- [0.65.1](#0651)
+  - [Fixed](#fixed-1)
+- [0.65.0](#0650)
   - [Added](#added-1)
   - [Changed](#changed-1)
-  - [Fixed](#fixed-1)
-- [0.60.1](#0601)
-  - [Fixed](#fixed-2)
-- [0.60.0](#0600)
-  - [Added](#added-2)
-  - [Fixed](#fixed-3)
-  - [Changed](#changed-2)
   - [Removed](#removed-1)
+- [0.64.0](#0640)
+  - [Added](#added-2)
+  - [Changed](#changed-2)
+- [0.63.0](#0630)
+  - [Added](#added-3)
+  - [Changed](#changed-3)
+  - [Removed](#removed-2)
+- [0.62.0](#0620)
+  - [Added](#added-4)
+  - [Changed](#changed-4)
+  - [Fixed](#fixed-2)
+- [0.61.0](#0610)
+  - [Added](#added-5)
+  - [Changed](#changed-5)
+  - [Fixed](#fixed-3)
+- [0.60.1](#0601)
+  - [Fixed](#fixed-4)
+- [0.60.0](#0600)
+  - [Added](#added-6)
+  - [Fixed](#fixed-5)
+  - [Changed](#changed-6)
+  - [Removed](#removed-3)
 - [0.59.2](#0592)
 - [0.59.1](#0591)
-  - [Fixed](#fixed-4)
-- [0.59.0](#0590)
-  - [Added](#added-3)
-  - [Fixed](#fixed-5)
-  - [Changed](#changed-3)
-- [0.58.1](#0581)
-  - [Added](#added-4)
-- [0.58.0](#0580)
-  - [Added](#added-5)
   - [Fixed](#fixed-6)
-  - [Changed](#changed-4)
-  - [Deprecated](#deprecated)
-  - [Removed](#removed-2)
+- [0.59.0](#0590)
+  - [Added](#added-7)
   - [Fixed](#fixed-7)
+  - [Changed](#changed-7)
+- [0.58.1](#0581)
+  - [Added](#added-8)
+- [0.58.0](#0580)
+  - [Added](#added-9)
+  - [Fixed](#fixed-8)
+  - [Changed](#changed-8)
+  - [Deprecated](#deprecated)
+  - [Removed](#removed-4)
+  - [Fixed](#fixed-9)
   - [Security](#security-1)
 - [0.57.0](#0570)
-  - [Added](#added-6)
-  - [Fixed](#fixed-8)
-- [0.56.0](#0560)
-  - [Added](#added-7)
-  - [Changed](#changed-5)
-  - [Fixed](#fixed-9)
-- [0.55.1](#0551)
-  - [Fixed](#fixed-10)
-- [0.55.0](#0550)
-  - [Removed](#removed-3)
-  - [Added](#added-8)
-  - [Changed](#changed-6)
-  - [Fixed](#fixed-11)
-- [0.54.1](#0541)
-  - [Added](#added-9)
-  - [Changed](#changed-7)
-  - [Fixed](#fixed-12)
-- [0.54.0](#0540)
   - [Added](#added-10)
-  - [Changed](#changed-8)
-  - [Fixed](#fixed-13)
-- [0.53.3](#0533)
+  - [Fixed](#fixed-10)
+- [0.56.0](#0560)
   - [Added](#added-11)
-  - [Fixed](#fixed-14)
-- [0.53.2](#0532)
   - [Changed](#changed-9)
-- [0.53.1](#0531)
+  - [Fixed](#fixed-11)
+- [0.55.1](#0551)
+  - [Fixed](#fixed-12)
+- [0.55.0](#0550)
+  - [Removed](#removed-5)
   - [Added](#added-12)
-- [0.53.0](#0530)
-  - [Added](#added-13)
   - [Changed](#changed-10)
-  - [Fixed](#fixed-15)
-- [0.52.0](#0520)
-  - [Added](#added-14)
+  - [Fixed](#fixed-13)
+- [0.54.1](#0541)
+  - [Added](#added-13)
   - [Changed](#changed-11)
-  - [Fixed](#fixed-16)
-- [0.51.1](#0511)
-  - [Fixed](#fixed-17)
+  - [Fixed](#fixed-14)
+- [0.54.0](#0540)
+  - [Added](#added-14)
   - [Changed](#changed-12)
-- [0.51.0](#0510)
-  - [Fixed](#fixed-18)
-  - [Changed](#changed-13)
+  - [Fixed](#fixed-15)
+- [0.53.3](#0533)
   - [Added](#added-15)
-- [0.50.0](#0500)
+  - [Fixed](#fixed-16)
+- [0.53.2](#0532)
+  - [Changed](#changed-13)
+- [0.53.1](#0531)
   - [Added](#added-16)
-- [0.49.3](#0493)
+- [0.53.0](#0530)
   - [Added](#added-17)
-- [0.49.2](#0492)
   - [Changed](#changed-14)
-- [0.49.1](#0491)
-  - [Fixed](#fixed-19)
-  - [Changed](#changed-15)
-- [0.49.0](#0490)
+  - [Fixed](#fixed-17)
+- [0.52.0](#0520)
   - [Added](#added-18)
-  - [Fixed](#fixed-20)
+  - [Changed](#changed-15)
+  - [Fixed](#fixed-18)
+- [0.51.1](#0511)
+  - [Fixed](#fixed-19)
   - [Changed](#changed-16)
-- [0.48.1](#0481)
-  - [Fixed](#fixed-21)
-- [0.48.0](#0480)
+- [0.51.0](#0510)
+  - [Fixed](#fixed-20)
   - [Changed](#changed-17)
-  - [Fixed](#fixed-22)
-- [0.47.4](#0474)
   - [Added](#added-19)
-- [0.47.3](#0473)
-  - [Changed](#changed-18)
-- [0.47.2](#0472)
-  - [Fixed](#fixed-23)
-- [0.47.1](#0471)
-  - [Changed](#changed-19)
-  - [Fixed](#fixed-24)
-- [0.47.0](#0470)
-  - [Changed](#changed-20)
-  - [Fixed](#fixed-25)
-- [0.33.1 .. 0.46.0](#0331--0460)
+- [0.50.0](#0500)
   - [Added](#added-20)
-  - [Removed](#removed-4)
+- [0.49.3](#0493)
+  - [Added](#added-21)
+- [0.49.2](#0492)
+  - [Changed](#changed-18)
+- [0.49.1](#0491)
+  - [Fixed](#fixed-21)
+  - [Changed](#changed-19)
+- [0.49.0](#0490)
+  - [Added](#added-22)
+  - [Fixed](#fixed-22)
+  - [Changed](#changed-20)
+- [0.48.1](#0481)
+  - [Fixed](#fixed-23)
+- [0.48.0](#0480)
   - [Changed](#changed-21)
+  - [Fixed](#fixed-24)
+- [0.47.4](#0474)
+  - [Added](#added-23)
+- [0.47.3](#0473)
+  - [Changed](#changed-22)
+- [0.47.2](#0472)
+  - [Fixed](#fixed-25)
+- [0.47.1](#0471)
+  - [Changed](#changed-23)
   - [Fixed](#fixed-26)
-- [0.33.1](#0331)
+- [0.47.0](#0470)
+  - [Changed](#changed-24)
   - [Fixed](#fixed-27)
+- [0.33.1 .. 0.46.0](#0331--0460)
+  - [Added](#added-24)
+  - [Removed](#removed-6)
+  - [Changed](#changed-25)
+  - [Fixed](#fixed-28)
+- [0.33.1](#0331)
+  - [Fixed](#fixed-29)
 - [0.33.0](#0330)
 - [0.32.2](#0322)
-  - [Fixed](#fixed-28)
-- [0.32.1](#0321)
-  - [Fixed](#fixed-29)
-- [0.32.0](#0320)
-  - [Added](#added-21)
-  - [Changed](#changed-22)
   - [Fixed](#fixed-30)
-- [0.31.0](#0310)
-  - [Added](#added-22)
-  - [Changed](#changed-23)
-  - [Deprecated](#deprecated-1)
-  - [Removed](#removed-5)
+- [0.32.1](#0321)
   - [Fixed](#fixed-31)
-- [0.30.0](#0300)
-  - [Added](#added-23)
-  - [Changed](#changed-24)
-  - [Deprecated](#deprecated-2)
+- [0.32.0](#0320)
+  - [Added](#added-25)
+  - [Changed](#changed-26)
   - [Fixed](#fixed-32)
-- [0.29.0](#0290)
-  - [Added](#added-24)
-  - [Changed](#changed-25)
+- [0.31.0](#0310)
+  - [Added](#added-26)
+  - [Changed](#changed-27)
+  - [Deprecated](#deprecated-1)
+  - [Removed](#removed-7)
   - [Fixed](#fixed-33)
+- [0.30.0](#0300)
+  - [Added](#added-27)
+  - [Changed](#changed-28)
+  - [Deprecated](#deprecated-2)
+  - [Fixed](#fixed-34)
+- [0.29.0](#0290)
+  - [Added](#added-28)
+  - [Changed](#changed-29)
+  - [Fixed](#fixed-35)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -148,22 +165,141 @@
 # Unreleased
 
 ## Added
- * new feature: `--override-abi` flag to override the ABI used by functions
-   matching a regular expression.
 
 ## Changed
-
- * Regex inputs are sanitized so alternation (`a|b`) is handled correctly but
-   wildcard patterns (`*`) are now considered invalid.
- * the `ParseCallbacks`trait does not require to implement `UnwindSafe`.
- * the `Builder::parse_callbacks` method no longer overwrites previously added
-   callbacks and composes them in a last-to-first manner.
-
+   
 ## Removed
 
 ## Fixed
 
 ## Security
+
+# 0.65.1
+
+## Fixed
+
+* The `Builder::rustfmt_bindings` method was added back and tagged as
+  deprecated instead of being removed.
+* Broken documentation links were fixed.
+
+# 0.65.0
+
+## Added
+ * Added the `Builder::default_visibility` method and the
+   `--default-visibility` flag to set the default visibility of fields. (#2338)
+ * Added the `--formatter` CLI flag with the values `none`, `rustfmt` and
+   `prettyplease` to select which tool will be used to format the bindings. The
+   default value is `rustfmt`. (#2453)
+ * Added the `Builder::formatter` method and the `Formatter` type to select
+   which tool will be used to format the bindings. (#2453)
+ * Added the `Builder::emit_diagnostics` method and the  `--emit-diagnostics`
+   flag to enable emission of diagnostic messages under the `experimental`
+   feature. (#2436)
+ * Added support for the `"efiapi"` calling convention (#2490).
+ * Added the `ParseCallbacks::read_env_var` method which runs everytime
+   `bindgen` reads and environment variable. (#2400)
+ * Added the `ParseCallbacks::generated_link_name_override` method which allow
+   overriding the link name of items. (#2425)
+ * Add support for C `enum`s when generating code while using the
+   `--wrap-static-fns` feature. (#2415)
+
+## Changed
+ * Static functions with no arguments use `void` as their single argument
+   instead of having no arguments when the `--wrap-static-fns` flag is used.
+   (#2443)
+ * The source file generated when the `--wrap-static-fns` flag is enabled now
+   contains `#include` directives with all the input headers and all the source
+   code added with the `header_contents` method. (#2447)
+ * The source file generated when the `--wrap-static-fns` flag no longer uses
+   `asm` labeling and the link name of static wrapper functions is allowed to
+   be mangled. (#2448)
+ * The documentation of the generated `type` aliases now matches the comments
+   of their `typedef` counterparts instead of using the comments of the aliased
+   types. (#2463)
+ * The `Builder::rustfmt_bindings` methods and the `--no-rustfmt-bindings` flag
+   are now deprecated in favor of the formatter API. (#2453)
+   
+## Removed
+ * The following deprecated flags were removed: `--use-msvc-mangling`,
+   `--rustfmt-bindings` and `--size_t-is-usize`. (#2408)
+ * The `Bindings::emit_warnings` and `Bindings::warnings` methods were removed
+   in favor of `--emit-diagnostics`. (#2436)
+ * Bindgen no longer generates C string constants that cannot be represented as
+   byte slices. (#2487)
+
+# 0.64.0
+
+## Added
+ * Added a new set of flags `--with-derive-custom`,
+   `--with-derive-custom-struct`, `--with-derive-custom-enum` and
+   `--with-derive-custom-enum` to add custom derives from the CLI.
+ * Added the `--experimental` flag on `bindgen-cli` and the `experimental`
+   feature on `bindgen` to gate experimental features whose implementation is
+   incomplete or are prone to change in a non-backwards compatible manner.
+ * Added a new set of flags and their equivalent builder methods
+   `--wrap-static-fns`, `--wrap-static-fns-suffix` and `--wrap-static-fns-path`
+   to generate C function wrappers for `static` or `static inline` functions.
+   This feature is experimental.
+
+## Changed
+ * Fixed name collisions when having a C `enum` and a `typedef` with the same
+   name.
+ * The `ParseCallbacks::generated_name_override` method now receives `ItemInfo<'_>` as
+   argument instead of a `&str`.
+ * Updated the `clang-sys` crate version to 1.4.0 to support clang 15.
+ * The return type is now ommited in signatures of functions returning `void`.
+ * Updated the `clap` dependency for `bindgen-cli` to 4.
+ * Rewrote the `bindgen-cli` argument parser which could introduce unexpected
+   behavior changes. 
+ * The `ParseCallbacks::add_derives` method now receives `DeriveInfo<'_>` as
+   argument instead of a `&str`. This type also includes the kind of target type.
+
+# 0.63.0
+
+## Added
+ * new feature: `process_comments` method to the `ParseCallbacks` trait to
+   handle source code comments.
+
+## Changed
+ * Only wrap unsafe operations in unsafe blocks if the `--wrap_unsafe_ops`
+   option is enabled.
+ * Replace the `name: &str` argument for `ParseCallbacks::add_derives` by
+   `info: DeriveInfo`.
+ * All the rust targets equal or lower than `1.30` are being deprecated and
+   will be removed in the future. If you have a good reason to use any of these
+   targets, please report it in the issue tracker.
+
+## Removed
+
+ * The following deprecated methods and their equivalent CLI arguments were
+   removed: `whitelist_recursively`, `hide_type`, `blacklist_type`,
+   `blacklist_function`, `blacklist_item`, `whitelisted_type`,
+   `whitelist_type`, `whitelist_function`, `whitelisted_function`,
+   `whitelist_var`, `whitelisted_var`, `unstable_rust`.
+
+# 0.62.0
+
+## Added
+
+ * new feature: `--override-abi` flag to override the ABI used by functions
+   matching a regular expression.
+ * new feature: allow using the `C-unwind` ABI in `--override-abi` on nightly
+   rust.
+
+## Changed
+
+ * Regex inputs are sanitized so alternation (`a|b`) is handled correctly but
+   wildcard patterns (`*`) are now considered invalid. The `.*` pattern can be
+   used as a replacement.
+ * the `ParseCallbacks`trait does not require to implement `UnwindSafe`.
+ * the `Builder::parse_callbacks` method no longer overwrites previously added
+   callbacks and composes them in a last-to-first manner.
+ * any generated rust code containing unsafe operations inside unsafe functions
+   is wrapped in unsafe blocks now.
+
+## Fixed
+
+ * Various issues with upcoming clang/libclang versions have been fixed.
 
 # 0.61.0
 
@@ -1252,7 +1388,7 @@ Released 2017/10/27
   have. [#1094][]
 
 [faq]: https://rust-lang.github.io/rust-bindgen/faq.html
-[fuzzing]: https://github.com/rust-lang/rust-bindgen/blob/master/csmith-fuzzing/README.md
+[fuzzing]: https://github.com/rust-lang/rust-bindgen/blob/main/csmith-fuzzing/README.md
 
 [#938]: https://github.com/rust-lang/rust-bindgen/issues/938
 [#888]: https://github.com/rust-lang/rust-bindgen/issues/888

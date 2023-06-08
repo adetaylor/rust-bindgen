@@ -1,14 +1,401 @@
 use autocxx_bindgen as bindgen;
+use bindgen::callbacks::TypeKind;
 use bindgen::{
     builder, AliasVariation, Builder, CodegenConfig, EnumVariation,
-    MacroTypeVariation, NonCopyUnionStyle, RustTarget,
-    DEFAULT_ANON_FIELDS_PREFIX, RUST_TARGET_STRINGS,
+    FieldVisibilityKind, Formatter, MacroTypeVariation, NonCopyUnionStyle,
+    RegexSet, RustTarget, DEFAULT_ANON_FIELDS_PREFIX, RUST_TARGET_STRINGS,
 };
-use clap::{App, Arg};
+use clap::Parser;
 use std::fs::File;
-use std::io::{self, stderr, Error, ErrorKind, Write};
+use std::io::{self, Error, ErrorKind};
 use std::path::PathBuf;
-use std::str::FromStr;
+
+fn rust_target_help() -> String {
+    format!(
+        "Version of the Rust compiler to target. Valid options are: {:?}. Defaults to {:?}.",
+        RUST_TARGET_STRINGS,
+        String::from(RustTarget::default())
+    )
+}
+
+fn parse_codegen_config(what_to_generate: &str) -> io::Result<CodegenConfig> {
+    let mut config = CodegenConfig::empty();
+    for what in what_to_generate.split(',') {
+        match what {
+            "functions" => config.insert(CodegenConfig::FUNCTIONS),
+            "types" => config.insert(CodegenConfig::TYPES),
+            "vars" => config.insert(CodegenConfig::VARS),
+            "methods" => config.insert(CodegenConfig::METHODS),
+            "constructors" => config.insert(CodegenConfig::CONSTRUCTORS),
+            "destructors" => config.insert(CodegenConfig::DESTRUCTORS),
+            otherwise => {
+                return Err(Error::new(
+                    ErrorKind::Other,
+                    format!("Unknown generate item: {}", otherwise),
+                ));
+            }
+        }
+    }
+
+    Ok(config)
+}
+
+#[derive(Parser, Debug)]
+#[clap(
+    about = "Generates Rust bindings from C/C++ headers.",
+    override_usage = "bindgen [FLAGS] [OPTIONS] [HEADER] -- [CLANG_ARGS]...",
+    trailing_var_arg = true
+)]
+struct BindgenCommand {
+    /// C or C++ header file.
+    header: Option<String>,
+    /// Path to write depfile to.
+    #[arg(long)]
+    depfile: Option<String>,
+    /// The default style of code used to generate enums.
+    #[arg(long, value_name = "VARIANT")]
+    default_enum_style: Option<EnumVariation>,
+    /// Mark any enum whose name matches REGEX as a set of bitfield flags.
+    #[arg(long, value_name = "REGEX")]
+    bitfield_enum: Vec<String>,
+    /// Mark any enum whose name matches REGEX as a newtype.
+    #[arg(long, value_name = "REGEX")]
+    newtype_enum: Vec<String>,
+    /// Mark any enum whose name matches REGEX as a global newtype.
+    #[arg(long, value_name = "REGEX")]
+    newtype_global_enum: Vec<String>,
+    /// Mark any enum whose name matches REGEX as a Rust enum.
+    #[arg(long, value_name = "REGEX")]
+    rustified_enum: Vec<String>,
+    /// Mark any enum whose name matches REGEX as a series of constants.
+    #[arg(long, value_name = "REGEX")]
+    constified_enum: Vec<String>,
+    /// Mark any enum whose name matches REGEX as a module of constants.
+    #[arg(long, value_name = "REGEX")]
+    constified_enum_module: Vec<String>,
+    /// The default signed/unsigned type for C macro constants.
+    #[arg(long, value_name = "VARIANT")]
+    default_macro_constant_type: Option<MacroTypeVariation>,
+    /// The default style of code used to generate typedefs.
+    #[arg(long, value_name = "VARIANT")]
+    default_alias_style: Option<AliasVariation>,
+    /// Mark any typedef alias whose name matches REGEX to use normal type aliasing.
+    #[arg(long, value_name = "REGEX")]
+    normal_alias: Vec<String>,
+    /// Mark any typedef alias whose name matches REGEX to have a new type generated for it.
+    #[arg(long, value_name = "REGEX")]
+    new_type_alias: Vec<String>,
+    /// Mark any typedef alias whose name matches REGEX to have a new type with Deref and DerefMut to the inner type.
+    #[arg(long, value_name = "REGEX")]
+    new_type_alias_deref: Vec<String>,
+    /// The default style of code used to generate unions with non-Copy members. Note that ManuallyDrop was first stabilized in Rust 1.20.0.
+    #[arg(long, value_name = "STYLE")]
+    default_non_copy_union_style: Option<NonCopyUnionStyle>,
+    /// Mark any union whose name matches REGEX and who has a non-Copy member to use a bindgen-generated wrapper for fields.
+    #[arg(long, value_name = "REGEX")]
+    bindgen_wrapper_union: Vec<String>,
+    /// Mark any union whose name matches REGEX and who has a non-Copy member to use ManuallyDrop (stabilized in Rust 1.20.0) for fields.
+    #[arg(long, value_name = "REGEX")]
+    manually_drop_union: Vec<String>,
+    /// Mark TYPE as hidden.
+    #[arg(long, value_name = "TYPE")]
+    blocklist_type: Vec<String>,
+    /// Mark FUNCTION as hidden.
+    #[arg(long, value_name = "FUNCTION")]
+    blocklist_function: Vec<String>,
+    /// Mark ITEM as hidden.
+    #[arg(long, value_name = "ITEM")]
+    blocklist_item: Vec<String>,
+    /// Mark FILE as hidden.
+    #[arg(long, value_name = "FILE")]
+    blocklist_file: Vec<String>,
+    /// Avoid generating layout tests for any type.
+    #[arg(long)]
+    no_layout_tests: bool,
+    /// Avoid deriving Copy on any type.
+    #[arg(long)]
+    no_derive_copy: bool,
+    /// Avoid deriving Debug on any type.
+    #[arg(long)]
+    no_derive_debug: bool,
+    /// Avoid deriving Default on any type.
+    #[arg(long, hide = true)]
+    no_derive_default: bool,
+    /// Create a Debug implementation if it cannot be derived automatically.
+    #[arg(long)]
+    impl_debug: bool,
+    /// Create a PartialEq implementation if it cannot be derived automatically.
+    #[arg(long)]
+    impl_partialeq: bool,
+    /// Derive Default on any type.
+    #[arg(long)]
+    with_derive_default: bool,
+    /// Derive Hash on any type.
+    #[arg(long)]
+    with_derive_hash: bool,
+    /// Derive PartialEq on any type.
+    #[arg(long)]
+    with_derive_partialeq: bool,
+    /// Derive PartialOrd on any type.
+    #[arg(long)]
+    with_derive_partialord: bool,
+    /// Derive Eq on any type.
+    #[arg(long)]
+    with_derive_eq: bool,
+    /// Derive Ord on any type.
+    #[arg(long)]
+    with_derive_ord: bool,
+    /// Avoid including doc comments in the output, see: <https://github.com/rust-lang/rust-bindgen/issues/426>
+    #[arg(long)]
+    no_doc_comments: bool,
+    /// Disable allowlisting types recursively. This will cause bindgen to emit Rust code that won't compile! See the `bindgen::Builder::allowlist_recursively` method's documentation for details.
+    #[arg(long)]
+    no_recursive_allowlist: bool,
+    /// Use extern crate instead of use for objc.
+    #[arg(long)]
+    objc_extern_crate: bool,
+    /// Generate block signatures instead of void pointers.
+    #[arg(long)]
+    generate_block: bool,
+    /// Use extern crate instead of use for block.
+    #[arg(long)]
+    block_extern_crate: bool,
+    /// Do not trust the libclang-provided mangling
+    #[arg(long)]
+    distrust_clang_mangling: bool,
+    /// Output bindings for builtin definitions, e.g. __builtin_va_list.
+    #[arg(long)]
+    builtins: bool,
+    /// Use the given prefix before raw types instead of ::std::os::raw.
+    #[arg(long, value_name = "PREFIX")]
+    ctypes_prefix: Option<String>,
+    /// Use the given prefix for anonymous fields.
+    #[arg(long, default_value = DEFAULT_ANON_FIELDS_PREFIX, value_name = "PREFIX")]
+    anon_fields_prefix: String,
+    /// Time the different bindgen phases and print to stderr
+    #[arg(long)]
+    time_phases: bool,
+    /// Output the Clang AST for debugging purposes.
+    #[arg(long)]
+    emit_clang_ast: bool,
+    /// Output our internal IR for debugging purposes.
+    #[arg(long)]
+    emit_ir: bool,
+    /// Dump graphviz dot file.
+    #[arg(long, value_name = "PATH")]
+    emit_ir_graphviz: Option<String>,
+    /// Enable support for C++ namespaces.
+    #[arg(long)]
+    enable_cxx_namespaces: bool,
+    /// Disable namespacing via mangling, causing bindgen to generate names like `Baz` instead of `foo_bar_Baz` for an input name `foo::bar::Baz`.
+    #[arg(long)]
+    disable_name_namespacing: bool,
+    /// Disable nested struct naming, causing bindgen to generate names like `bar` instead of `foo_bar` for a nested definition `struct foo { struct bar { } b; };`.
+    #[arg(long)]
+    disable_nested_struct_naming: bool,
+    /// Disable support for native Rust unions.
+    #[arg(long)]
+    disable_untagged_union: bool,
+    /// Suppress insertion of bindgen's version identifier into generated bindings.
+    #[arg(long)]
+    disable_header_comment: bool,
+    /// Do not generate bindings for functions or methods. This is useful when you only care about struct layouts.
+    #[arg(long)]
+    ignore_functions: bool,
+    /// Generate only given items, split by commas. Valid values are `functions`,`types`, `vars`, `methods`, `constructors` and `destructors`.
+    #[arg(long, value_parser = parse_codegen_config)]
+    generate: Option<CodegenConfig>,
+    /// Do not generate bindings for methods.
+    #[arg(long)]
+    ignore_methods: bool,
+    /// Do not automatically convert floats to f32/f64.
+    #[arg(long)]
+    no_convert_floats: bool,
+    /// Do not prepend the enum name to constant or newtype variants.
+    #[arg(long)]
+    no_prepend_enum_name: bool,
+    /// Do not try to detect default include paths
+    #[arg(long)]
+    no_include_path_detection: bool,
+    /// Try to fit macro constants into types smaller than u32/i32
+    #[arg(long)]
+    fit_macro_constant_types: bool,
+    /// Mark TYPE as opaque.
+    #[arg(long, value_name = "TYPE")]
+    opaque_type: Vec<String>,
+    ///  Write Rust bindings to OUTPUT.
+    #[arg(long, short, value_name = "OUTPUT")]
+    output: Option<String>,
+    /// Add a raw line of Rust code at the beginning of output.
+    #[arg(long)]
+    raw_line: Vec<String>,
+    /// Add a raw line of Rust code to a given module.
+    #[arg(long, number_of_values = 2, value_names = ["MODULE-NAME", "RAW-LINE"])]
+    module_raw_line: Vec<String>,
+    #[arg(long, help = rust_target_help())]
+    rust_target: Option<RustTarget>,
+    /// Use types from Rust core instead of std.
+    #[arg(long)]
+    use_core: bool,
+    /// Conservatively generate inline namespaces to avoid name conflicts.
+    #[arg(long)]
+    conservative_inline_namespaces: bool,
+    /// Allowlist all the free-standing functions matching REGEX. Other non-allowlisted functions will not be generated.
+    #[arg(long, value_name = "REGEX")]
+    allowlist_function: Vec<String>,
+    /// Generate inline functions.
+    #[arg(long)]
+    generate_inline_functions: bool,
+    /// Only generate types matching REGEX. Other non-allowlisted types will not be generated.
+    #[arg(long, value_name = "REGEX")]
+    allowlist_type: Vec<String>,
+    /// Allowlist all the free-standing variables matching REGEX. Other non-allowlisted variables will not be generated.
+    #[arg(long, value_name = "REGEX")]
+    allowlist_var: Vec<String>,
+    /// Allowlist all contents of PATH.
+    #[arg(long, value_name = "PATH")]
+    allowlist_file: Vec<String>,
+    /// Print verbose error messages.
+    #[arg(long)]
+    verbose: bool,
+    /// Preprocess and dump the input header files to disk. Useful when debugging bindgen, using C-Reduce, or when filing issues. The resulting file will be named something like `__bindgen.i` or `__bindgen.ii`.
+    #[arg(long)]
+    dump_preprocessed_input: bool,
+    /// Do not record matching items in the regex sets. This disables reporting of unused items.
+    #[arg(long)]
+    no_record_matches: bool,
+    /// Do not bind size_t as usize (useful on platforms where those types are incompatible).
+    #[arg(long = "no-size_t-is-usize")]
+    no_size_t_is_usize: bool,
+    /// Do not format the generated bindings with rustfmt. This option is deprecated, please use
+    /// `--formatter=none` instead.
+    #[arg(long)]
+    no_rustfmt_bindings: bool,
+    /// Which tool should be used to format the bindings
+    #[arg(
+        long,
+        value_name = "FORMATTER",
+        conflicts_with = "no_rustfmt_bindings"
+    )]
+    formatter: Option<Formatter>,
+    /// The absolute path to the rustfmt configuration file. The configuration file will be used for formatting the bindings. This parameter sets `formatter` to `rustfmt`.
+    #[arg(long, value_name = "PATH", conflicts_with = "no_rustfmt_bindings")]
+    rustfmt_configuration_file: Option<String>,
+    /// Avoid deriving PartialEq for types matching REGEX.
+    #[arg(long, value_name = "REGEX")]
+    no_partialeq: Vec<String>,
+    /// Avoid deriving Copy and Clone for types matching REGEX.
+    #[arg(long, value_name = "REGEX")]
+    no_copy: Vec<String>,
+    /// Avoid deriving Debug for types matching REGEX.
+    #[arg(long, value_name = "REGEX")]
+    no_debug: Vec<String>,
+    /// Avoid deriving/implementing Default for types matching REGEX.
+    #[arg(long, value_name = "REGEX")]
+    no_default: Vec<String>,
+    /// Avoid deriving Hash for types matching REGEX.
+    #[arg(long, value_name = "REGEX")]
+    no_hash: Vec<String>,
+    /// Add `#[must_use]` annotation to types matching REGEX.
+    #[arg(long, value_name = "REGEX")]
+    must_use_type: Vec<String>,
+    /// Enables detecting unexposed attributes in functions (slow). Used to generate `#[must_use]` annotations.
+    #[arg(long)]
+    enable_function_attribute_detection: bool,
+    /// Use `*const [T; size]` instead of `*const T` for C arrays
+    #[arg(long)]
+    use_array_pointers_in_arguments: bool,
+    /// The name to be used in a #[link(wasm_import_module = ...)] statement
+    #[arg(long, value_name = "NAME")]
+    wasm_import_module_name: Option<String>,
+    /// Use dynamic loading mode with the given library name.
+    #[arg(long, value_name = "NAME")]
+    dynamic_loading: Option<String>,
+    /// Require successful linkage to all functions in the library.
+    #[arg(long)]
+    dynamic_link_require_all: bool,
+    /// Prefix the name of exported symbols.
+    #[arg(long)]
+    prefix_link_name: Option<String>,
+    /// Makes generated bindings `pub` only for items if the items are publically accessible in C++.
+    #[arg(long)]
+    respect_cxx_access_specs: bool,
+    /// Always translate enum integer types to native Rust integer types.
+    #[arg(long)]
+    translate_enum_integer_types: bool,
+    /// Generate types with C style naming.
+    #[arg(long)]
+    c_naming: bool,
+    /// Always output explicit padding fields.
+    #[arg(long)]
+    explicit_padding: bool,
+    /// Always be specific about the 'receiver' of a virtual function.
+    #[arg(long)]
+    use_specific_virtual_function_receiver: bool,
+    /// Output C++ overloaded operators
+    #[arg(long)]
+    represent_cxx_operators: bool,
+    /// Output additional attributes denoting the intende semantics of each C++ function and type.
+    /// Useful for downstream code generators.
+    #[arg(long)]
+    cpp_semantic_attributes: bool,
+    /// Use distinct char16_t
+    #[arg(long)]
+    use_distinct_char16_t: bool,
+    /// Enables generation of vtable functions.
+    #[arg(long)]
+    vtable_generation: bool,
+    /// Enables sorting of code generation in a predefined manner.
+    #[arg(long)]
+    sort_semantically: bool,
+    /// Deduplicates extern blocks.
+    #[arg(long)]
+    merge_extern_blocks: bool,
+    /// Overrides the ABI of functions matching REGEX. The OVERRIDE value must be of the shape REGEX=ABI where ABI can be one of C, stdcall, efiapi, fastcall, thiscall, aapcs, win64 or C-unwind.
+    #[arg(long, value_name = "OVERRIDE")]
+    override_abi: Vec<String>,
+    /// Wrap unsafe operations in unsafe blocks.
+    #[arg(long)]
+    wrap_unsafe_ops: bool,
+    /// Derive custom traits on any kind of type. The CUSTOM value must be of the shape REGEX=DERIVE where DERIVE is a coma-separated list of derive macros.
+    #[arg(long, value_name = "CUSTOM")]
+    with_derive_custom: Vec<String>,
+    /// Derive custom traits on a `struct`. The CUSTOM value must be of the shape REGEX=DERIVE where DERIVE is a coma-separated list of derive macros.
+    #[arg(long, value_name = "CUSTOM")]
+    with_derive_custom_struct: Vec<String>,
+    /// Derive custom traits on an `enum. The CUSTOM value must be of the shape REGEX=DERIVE where DERIVE is a coma-separated list of derive macros.
+    #[arg(long, value_name = "CUSTOM")]
+    with_derive_custom_enum: Vec<String>,
+    /// Derive custom traits on a `union`. The CUSTOM value must be of the shape REGEX=DERIVE where DERIVE is a coma-separated list of derive macros.
+    #[arg(long, value_name = "CUSTOM")]
+    with_derive_custom_union: Vec<String>,
+    /// Generate wrappers for `static` and `static inline` functions.
+    #[arg(long, requires = "experimental")]
+    wrap_static_fns: bool,
+    /// Sets the path for the source file that must be created due to the presence of `static` and
+    /// `static inline` functions.
+    #[arg(long, requires = "experimental", value_name = "PATH")]
+    wrap_static_fns_path: Option<PathBuf>,
+    /// Sets the suffix added to the extern wrapper functions generated for `static` and `static
+    /// inline` functions.
+    #[arg(long, requires = "experimental", value_name = "SUFFIX")]
+    wrap_static_fns_suffix: Option<String>,
+    /// Set the default visibility of fields, including bitfields and accessor methods for
+    /// bitfields. This flag is ignored if the `--respect-cxx-access-specs` flag is used.
+    #[arg(long, value_name = "VISIBILITY")]
+    default_visibility: Option<FieldVisibilityKind>,
+    /// Whether to emit diagnostics or not.
+    #[arg(long, requires = "experimental")]
+    emit_diagnostics: bool,
+    /// Enables experimental features.
+    #[arg(long)]
+    experimental: bool,
+    /// Prints the version, and exits
+    #[arg(short = 'V', long)]
+    version: bool,
+    /// Arguments to be passed straight through to clang.
+    clang_args: Vec<String>,
+}
 
 /// Construct a new [`Builder`](./struct.Builder.html) from command line flags.
 pub fn builder_from_flags<I>(
@@ -17,581 +404,122 @@ pub fn builder_from_flags<I>(
 where
     I: Iterator<Item = String>,
 {
-    let rust_target_help = format!(
-        "Version of the Rust compiler to target. Valid options are: {:?}. Defaults to {:?}.",
-        RUST_TARGET_STRINGS,
-        String::from(RustTarget::default())
-    );
+    let command = BindgenCommand::parse_from(args);
 
-    let matches = App::new("bindgen")
-        .about("Generates Rust bindings from C/C++ headers.")
-        .setting(clap::AppSettings::NoAutoVersion)
-        .override_usage("bindgen [FLAGS] [OPTIONS] <header> -- <clang-args>...")
-        .args(&[
-            Arg::new("header")
-                .help("C or C++ header file")
-                .required_unless_present("V"),
-            Arg::new("depfile")
-                .long("depfile")
-                .takes_value(true)
-                .help("Path to write depfile to"),
-            Arg::new("default-enum-style")
-                .long("default-enum-style")
-                .help("The default style of code used to generate enums.")
-                .value_name("variant")
-                .default_value("consts")
-                .possible_values([
-                    "consts",
-                    "moduleconsts",
-                    "bitfield",
-                    "newtype",
-                    "rust",
-                    "rust_non_exhaustive",
-                ])
-                .multiple_occurrences(false),
-            Arg::new("bitfield-enum")
-                .long("bitfield-enum")
-                .help(
-                    "Mark any enum whose name matches <regex> as a set of \
-                     bitfield flags.",
-                )
-                .value_name("regex")
-                .multiple_occurrences(true)
-                .number_of_values(1),
-            Arg::new("newtype-enum")
-                .long("newtype-enum")
-                .help("Mark any enum whose name matches <regex> as a newtype.")
-                .value_name("regex")
-                .multiple_occurrences(true)
-                .number_of_values(1),
-            Arg::new("newtype-global-enum")
-                .long("newtype-global-enum")
-                .help("Mark any enum whose name matches <regex> as a global newtype.")
-                .value_name("regex")
-                .multiple_occurrences(true)
-                .number_of_values(1),
-            Arg::new("rustified-enum")
-                .long("rustified-enum")
-                .help("Mark any enum whose name matches <regex> as a Rust enum.")
-                .value_name("regex")
-                .multiple_occurrences(true)
-                .number_of_values(1),
-            Arg::new("constified-enum")
-                .long("constified-enum")
-                .help(
-                    "Mark any enum whose name matches <regex> as a series of \
-                     constants.",
-                )
-                .value_name("regex")
-                .multiple_occurrences(true)
-                .number_of_values(1),
-            Arg::new("constified-enum-module")
-                .long("constified-enum-module")
-                .help(
-                    "Mark any enum whose name matches <regex> as a module of \
-                     constants.",
-                )
-                .value_name("regex")
-                .multiple_occurrences(true)
-                .number_of_values(1),
-            Arg::new("default-macro-constant-type")
-                .long("default-macro-constant-type")
-                .help("The default signed/unsigned type for C macro constants.")
-                .value_name("variant")
-                .default_value("unsigned")
-                .possible_values(["signed", "unsigned"])
-                .multiple_occurrences(false),
-            Arg::new("default-alias-style")
-                .long("default-alias-style")
-                .help("The default style of code used to generate typedefs.")
-                .value_name("variant")
-                .default_value("type_alias")
-                .possible_values([
-                    "type_alias",
-                    "new_type",
-                    "new_type_deref",
-                ])
-                .multiple_occurrences(false),
-            Arg::new("normal-alias")
-                .long("normal-alias")
-                .help(
-                    "Mark any typedef alias whose name matches <regex> to use \
-                     normal type aliasing.",
-                )
-                .value_name("regex")
-                .multiple_occurrences(true)
-                .number_of_values(1),
-             Arg::new("new-type-alias")
-                .long("new-type-alias")
-                .help(
-                    "Mark any typedef alias whose name matches <regex> to have \
-                     a new type generated for it.",
-                )
-                .value_name("regex")
-                .multiple_occurrences(true)
-                .number_of_values(1),
-             Arg::new("new-type-alias-deref")
-                .long("new-type-alias-deref")
-                .help(
-                    "Mark any typedef alias whose name matches <regex> to have \
-                     a new type with Deref and DerefMut to the inner type.",
-                )
-                .value_name("regex")
-                .multiple_occurrences(true)
-                .number_of_values(1),
-            Arg::new("default-non-copy-union-style")
-                .long("default-non-copy-union-style")
-                .help(
-                    "The default style of code used to generate unions with \
-                     non-Copy members. Note that ManuallyDrop was first \
-                     stabilized in Rust 1.20.0.",
-                )
-                .value_name("style")
-                .default_value("bindgen_wrapper")
-                .possible_values([
-                    "bindgen_wrapper",
-                    "manually_drop",
-                ])
-                .multiple_occurrences(false),
-            Arg::new("bindgen-wrapper-union")
-                .long("bindgen-wrapper-union")
-                .help(
-                    "Mark any union whose name matches <regex> and who has a \
-                     non-Copy member to use a bindgen-generated wrapper for \
-                     fields.",
-                )
-                .value_name("regex")
-                .takes_value(true)
-                .multiple_occurrences(true)
-                .number_of_values(1),
-            Arg::new("manually-drop-union")
-                .long("manually-drop-union")
-                .help(
-                    "Mark any union whose name matches <regex> and who has a \
-                     non-Copy member to use ManuallyDrop (stabilized in Rust \
-                     1.20.0) for fields.",
-                )
-                .value_name("regex")
-                .takes_value(true)
-                .multiple_occurrences(true)
-                .number_of_values(1),
-            Arg::new("blocklist-type")
-                .alias("blacklist-type")
-                .long("blocklist-type")
-                .help("Mark <type> as hidden.")
-                .value_name("type")
-                .multiple_occurrences(true)
-                .number_of_values(1),
-            Arg::new("blocklist-function")
-                .alias("blacklist-function")
-                .long("blocklist-function")
-                .help("Mark <function> as hidden.")
-                .value_name("function")
-                .multiple_occurrences(true)
-                .number_of_values(1),
-            Arg::new("blocklist-item")
-                .alias("blacklist-item")
-                .long("blocklist-item")
-                .help("Mark <item> as hidden.")
-                .value_name("item")
-                .multiple_occurrences(true)
-                .number_of_values(1),
-            Arg::new("blocklist-file")
-                .alias("blacklist-file")
-                .long("blocklist-file")
-                .help("Mark all contents of <path> as hidden.")
-                .value_name("path")
-                .multiple_occurrences(true)
-                .number_of_values(1),
-            Arg::new("no-layout-tests")
-                .long("no-layout-tests")
-                .help("Avoid generating layout tests for any type."),
-            Arg::new("no-derive-copy")
-                .long("no-derive-copy")
-                .help("Avoid deriving Copy on any type."),
-            Arg::new("no-derive-debug")
-                .long("no-derive-debug")
-                .help("Avoid deriving Debug on any type."),
-            Arg::new("no-derive-default")
-                .long("no-derive-default")
-                .hide(true)
-                .help("Avoid deriving Default on any type."),
-            Arg::new("impl-debug").long("impl-debug").help(
-                "Create Debug implementation, if it can not be derived \
-                 automatically.",
-            ),
-            Arg::new("impl-partialeq")
-                .long("impl-partialeq")
-                .help(
-                    "Create PartialEq implementation, if it can not be derived \
-                     automatically.",
-                ),
-            Arg::new("with-derive-default")
-                .long("with-derive-default")
-                .help("Derive Default on any type."),
-            Arg::new("with-derive-hash")
-                .long("with-derive-hash")
-                .help("Derive hash on any type."),
-            Arg::new("with-derive-partialeq")
-                .long("with-derive-partialeq")
-                .help("Derive partialeq on any type."),
-            Arg::new("with-derive-partialord")
-                .long("with-derive-partialord")
-                .help("Derive partialord on any type."),
-            Arg::new("with-derive-eq")
-                .long("with-derive-eq")
-                .help(
-                    "Derive eq on any type. Enable this option also \
-                     enables --with-derive-partialeq",
-                ),
-            Arg::new("with-derive-ord")
-                .long("with-derive-ord")
-                .help(
-                    "Derive ord on any type. Enable this option also \
-                     enables --with-derive-partialord",
-                ),
-            Arg::new("no-doc-comments")
-                .long("no-doc-comments")
-                .help(
-                    "Avoid including doc comments in the output, see: \
-                     https://github.com/rust-lang/rust-bindgen/issues/426",
-                ),
-            Arg::new("no-recursive-allowlist")
-                .long("no-recursive-allowlist")
-                .alias("no-recursive-whitelist")
-                .help(
-                    "Disable allowlisting types recursively. This will cause \
-                     bindgen to emit Rust code that won't compile! See the \
-                     `bindgen::Builder::allowlist_recursively` method's \
-                     documentation for details.",
-                ),
-            Arg::new("objc-extern-crate")
-                .long("objc-extern-crate")
-                .help("Use extern crate instead of use for objc."),
-            Arg::new("generate-block")
-                .long("generate-block")
-                .help("Generate block signatures instead of void pointers."),
-            Arg::new("block-extern-crate")
-                .long("block-extern-crate")
-                .help("Use extern crate instead of use for block."),
-            Arg::new("distrust-clang-mangling")
-                .long("distrust-clang-mangling")
-                .help("Do not trust the libclang-provided mangling"),
-            Arg::new("builtins").long("builtins").help(
-                "Output bindings for builtin definitions, e.g. \
-                 __builtin_va_list.",
-            ),
-            Arg::new("ctypes-prefix")
-                .long("ctypes-prefix")
-                .help(
-                    "Use the given prefix before raw types instead of \
-                     ::std::os::raw.",
-                )
-                .value_name("prefix"),
-            Arg::new("anon-fields-prefix")
-                .long("anon-fields-prefix")
-                .help("Use the given prefix for the anon fields.")
-                .value_name("prefix")
-                .default_value(DEFAULT_ANON_FIELDS_PREFIX),
-            Arg::new("time-phases")
-                .long("time-phases")
-                .help("Time the different bindgen phases and print to stderr"),
-            // All positional arguments after the end of options marker, `--`
-            Arg::new("clang-args").last(true).multiple_occurrences(true),
-            Arg::new("emit-clang-ast")
-                .long("emit-clang-ast")
-                .help("Output the Clang AST for debugging purposes."),
-            Arg::new("emit-ir")
-                .long("emit-ir")
-                .help("Output our internal IR for debugging purposes."),
-            Arg::new("emit-ir-graphviz")
-                .long("emit-ir-graphviz")
-                .help("Dump graphviz dot file.")
-                .value_name("path"),
-            Arg::new("enable-cxx-namespaces")
-                .long("enable-cxx-namespaces")
-                .help("Enable support for C++ namespaces."),
-            Arg::new("disable-name-namespacing")
-                .long("disable-name-namespacing")
-                .help(
-                    "Disable namespacing via mangling, causing bindgen to \
-                     generate names like \"Baz\" instead of \"foo_bar_Baz\" \
-                     for an input name \"foo::bar::Baz\".",
-                ),
-            Arg::new("disable-nested-struct-naming")
-                .long("disable-nested-struct-naming")
-                .help(
-                    "Disable nested struct naming, causing bindgen to generate \
-                     names like \"bar\" instead of \"foo_bar\" for a nested \
-                     definition \"struct foo { struct bar { } b; };\"."
-                ),
-            Arg::new("disable-untagged-union")
-                .long("disable-untagged-union")
-                .help(
-                    "Disable support for native Rust unions.",
-                ),
-            Arg::new("disable-header-comment")
-                .long("disable-header-comment")
-                .help("Suppress insertion of bindgen's version identifier into generated bindings.")
-                .multiple_occurrences(true),
-            Arg::new("ignore-functions")
-                .long("ignore-functions")
-                .help(
-                    "Do not generate bindings for functions or methods. This \
-                     is useful when you only care about struct layouts.",
-                ),
-            Arg::new("generate")
-                .long("generate")
-                .help(
-                    "Generate only given items, split by commas. \
-                     Valid values are \"functions\",\"types\", \"vars\", \
-                     \"methods\", \"constructors\" and \"destructors\".",
-                )
-                .takes_value(true),
-            Arg::new("ignore-methods")
-                .long("ignore-methods")
-                .help("Do not generate bindings for methods."),
-            Arg::new("no-convert-floats")
-                .long("no-convert-floats")
-                .help("Do not automatically convert floats to f32/f64."),
-            Arg::new("no-prepend-enum-name")
-                .long("no-prepend-enum-name")
-                .help("Do not prepend the enum name to constant or newtype variants."),
-            Arg::new("no-include-path-detection")
-                .long("no-include-path-detection")
-                .help("Do not try to detect default include paths"),
-            Arg::new("fit-macro-constant-types")
-                .long("fit-macro-constant-types")
-                .help("Try to fit macro constants into types smaller than u32/i32"),
-            Arg::new("unstable-rust")
-                .long("unstable-rust")
-                .help("Generate unstable Rust code (deprecated; use --rust-target instead).")
-                .multiple_occurrences(true), // FIXME: Pass legacy test suite
-            Arg::new("opaque-type")
-                .long("opaque-type")
-                .help("Mark <type> as opaque.")
-                .value_name("type")
-                .multiple_occurrences(true)
-                .number_of_values(1),
-            Arg::new("output")
-                .short('o')
-                .long("output")
-                .help("Write Rust bindings to <output>.")
-                .takes_value(true),
-            Arg::new("raw-line")
-                .long("raw-line")
-                .help("Add a raw line of Rust code at the beginning of output.")
-                .multiple_occurrences(true)
-                .number_of_values(1),
-            Arg::new("module-raw-line")
-                .long("module-raw-line")
-                .help("Add a raw line of Rust code to a given module.")
-                .multiple_occurrences(true)
-                .number_of_values(2)
-                .value_names(&["module-name", "raw-line"]),
-            Arg::new("rust-target")
-                .long("rust-target")
-                .help(rust_target_help.as_ref())
-                .takes_value(true),
-            Arg::new("use-core")
-                .long("use-core")
-                .help("Use types from Rust core instead of std."),
-            Arg::new("conservative-inline-namespaces")
-                .long("conservative-inline-namespaces")
-                .help(
-                    "Conservatively generate inline namespaces to avoid name \
-                     conflicts.",
-                ),
-            Arg::new("use-msvc-mangling")
-                .long("use-msvc-mangling")
-                .help("MSVC C++ ABI mangling. DEPRECATED: Has no effect."),
-            Arg::new("allowlist-function")
-                .long("allowlist-function")
-                .alias("whitelist-function")
-                .help(
-                    "Allowlist all the free-standing functions matching \
-                     <regex>. Other non-allowlisted functions will not be \
-                     generated.",
-                )
-                .value_name("regex")
-                .multiple_occurrences(true)
-                .number_of_values(1),
-            Arg::new("generate-inline-functions")
-                .long("generate-inline-functions")
-                .help("Generate inline functions."),
-            Arg::new("allowlist-type")
-                .long("allowlist-type")
-                .alias("whitelist-type")
-                .help(
-                    "Only generate types matching <regex>. Other non-allowlisted types will \
-                     not be generated.",
-                )
-                .value_name("regex")
-                .multiple_occurrences(true)
-                .number_of_values(1),
-            Arg::new("allowlist-var")
-                .long("allowlist-var")
-                .alias("whitelist-var")
-                .help(
-                    "Allowlist all the free-standing variables matching \
-                     <regex>. Other non-allowlisted variables will not be \
-                     generated.",
-                )
-                .value_name("regex")
-                .multiple_occurrences(true)
-                .number_of_values(1),
-            Arg::new("allowlist-file")
-                .alias("allowlist-file")
-                .long("allowlist-file")
-                .help("Allowlist all contents of <path>.")
-                .value_name("path")
-                .multiple_occurrences(true)
-                .number_of_values(1),
-            Arg::new("verbose")
-                .long("verbose")
-                .help("Print verbose error messages."),
-            Arg::new("dump-preprocessed-input")
-                .long("dump-preprocessed-input")
-                .help(
-                    "Preprocess and dump the input header files to disk. \
-                     Useful when debugging bindgen, using C-Reduce, or when \
-                     filing issues. The resulting file will be named \
-                     something like `__bindgen.i` or `__bindgen.ii`.",
-                ),
-            Arg::new("no-record-matches")
-                .long("no-record-matches")
-                .help(
-                    "Do not record matching items in the regex sets. \
-                     This disables reporting of unused items.",
-                ),
-            Arg::new("size_t-is-usize")
-                .long("size_t-is-usize")
-                .help("Ignored - this is enabled by default.")
-                .hidden(true),
-            Arg::with_name("no-size_t-is-usize")
-                .long("no-size_t-is-usize")
-                .help("Do not bind size_t as usize (useful on platforms \
-                       where those types are incompatible)."),
-            Arg::new("no-rustfmt-bindings")
-                .long("no-rustfmt-bindings")
-                .help("Do not format the generated bindings with rustfmt."),
-            Arg::new("rustfmt-bindings")
-                .long("rustfmt-bindings")
-                .help(
-                    "Format the generated bindings with rustfmt. DEPRECATED: \
-                     --rustfmt-bindings is now enabled by default. Disable \
-                     with --no-rustfmt-bindings.",
-                ),
-            Arg::new("rustfmt-configuration-file")
-                .long("rustfmt-configuration-file")
-                .help(
-                    "The absolute path to the rustfmt configuration file. \
-                     The configuration file will be used for formatting the bindings. \
-                     This parameter is incompatible with --no-rustfmt-bindings.",
-                )
-                .value_name("path")
-                .multiple_occurrences(false)
-                .number_of_values(1),
-            Arg::new("no-partialeq")
-                .long("no-partialeq")
-                .help("Avoid deriving PartialEq for types matching <regex>.")
-                .value_name("regex")
-                .multiple_occurrences(true)
-                .number_of_values(1),
-            Arg::new("no-copy")
-                .long("no-copy")
-                .help("Avoid deriving Copy for types matching <regex>.")
-                .value_name("regex")
-                .multiple_occurrences(true)
-                .number_of_values(1),
-            Arg::new("no-debug")
-                .long("no-debug")
-                .help("Avoid deriving Debug for types matching <regex>.")
-                .value_name("regex")
-                .multiple_occurrences(true)
-                .number_of_values(1),
-            Arg::new("no-default")
-                .long("no-default")
-                .help("Avoid deriving/implement Default for types matching <regex>.")
-                .value_name("regex")
-                .multiple_occurrences(true)
-                .number_of_values(1),
-            Arg::new("no-hash")
-                .long("no-hash")
-                .help("Avoid deriving Hash for types matching <regex>.")
-                .value_name("regex")
-                .multiple_occurrences(true)
-                .number_of_values(1),
-            Arg::new("must-use-type")
-                .long("must-use-type")
-                .help("Add #[must_use] annotation to types matching <regex>.")
-                .value_name("regex")
-                .multiple_occurrences(true)
-                .number_of_values(1),
-            Arg::new("enable-function-attribute-detection")
-                .long("enable-function-attribute-detection")
-                .help(
-                    "Enables detecting unexposed attributes in functions (slow).
-                       Used to generate #[must_use] annotations.",
-                ),
-            Arg::new("use-array-pointers-in-arguments")
-                .long("use-array-pointers-in-arguments")
-                .help("Use `*const [T; size]` instead of `*const T` for C arrays"),
-            Arg::new("wasm-import-module-name")
-                .long("wasm-import-module-name")
-                .value_name("name")
-                .help("The name to be used in a #[link(wasm_import_module = ...)] statement"),
-            Arg::new("dynamic-loading")
-                .long("dynamic-loading")
-                .takes_value(true)
-                .help("Use dynamic loading mode with the given library name."),
-            Arg::new("dynamic-link-require-all")
-                .long("dynamic-link-require-all")
-                .help("Require successful linkage to all functions in the library."),
-            Arg::new("respect-cxx-access-specs")
-                .long("respect-cxx-access-specs")
-                .help("Makes generated bindings `pub` only for items if the items are publically accessible in C++."),
-            Arg::new("translate-enum-integer-types")
-                .long("translate-enum-integer-types")
-                .help("Always translate enum integer types to native Rust integer types."),
-            Arg::new("c-naming")
-                .long("c-naming")
-                .help("Generate types with C style naming."),
-            Arg::new("explicit-padding")
-                .long("explicit-padding")
-                .help("Always output explicit padding fields."),
-            Arg::with_name("use-specific-virtual-function-receiver")
-                .long("use-specific-virtual-function-receiver")
-                .help("Always be specific about the 'receiver' of a virtual function."),
-            Arg::with_name("represent-cxx-operators")
-                .long("represent-cxx-operators")
-                .help("Output C++ overloaded operators"),
-            Arg::with_name("cpp-semantic-attributes")
-                .long("cpp-semantic-attributes")
-                .help("Output additional attributes denoting the intended semantics of each C++ function and type. Useful for downstream code generators."),
-            Arg::new("vtable-generation")
-                .long("vtable-generation")
-                .help("Enables generation of vtable functions."),
-            Arg::new("sort-semantically")
-                .long("sort-semantically")
-                .help("Enables sorting of code generation in a predefined manner."),
-            Arg::new("merge-extern-blocks")
-                .long("merge-extern-blocks")
-                .help("Deduplicates extern blocks."),
-            Arg::new("override-abi")
-                .long("override-abi")
-                .help("Overrides the ABI of functions matching <regex>. The <override> value must be of the shape <abi>:<regex> where <abi> can be one of C, stdcall, fastcall, thiscall, aapcs or win64.")
-                .value_name("override")
-                .multiple_occurrences(true)
-                .number_of_values(1),
-            Arg::new("V")
-                .long("version")
-                .help("Prints the version, and exits"),
-        ]) // .args()
-        .get_matches_from(args);
+    let BindgenCommand {
+        header,
+        depfile,
+        default_enum_style,
+        bitfield_enum,
+        newtype_enum,
+        newtype_global_enum,
+        rustified_enum,
+        constified_enum,
+        constified_enum_module,
+        default_macro_constant_type,
+        default_alias_style,
+        normal_alias,
+        new_type_alias,
+        new_type_alias_deref,
+        default_non_copy_union_style,
+        bindgen_wrapper_union,
+        manually_drop_union,
+        blocklist_type,
+        blocklist_function,
+        blocklist_item,
+        blocklist_file,
+        no_layout_tests,
+        no_derive_copy,
+        no_derive_debug,
+        no_derive_default,
+        impl_debug,
+        impl_partialeq,
+        with_derive_default,
+        with_derive_hash,
+        with_derive_partialeq,
+        with_derive_partialord,
+        with_derive_eq,
+        with_derive_ord,
+        no_doc_comments,
+        no_recursive_allowlist,
+        objc_extern_crate,
+        generate_block,
+        block_extern_crate,
+        distrust_clang_mangling,
+        builtins,
+        ctypes_prefix,
+        anon_fields_prefix,
+        time_phases,
+        emit_clang_ast,
+        emit_ir,
+        emit_ir_graphviz,
+        enable_cxx_namespaces,
+        disable_name_namespacing,
+        disable_nested_struct_naming,
+        disable_untagged_union,
+        disable_header_comment,
+        ignore_functions,
+        generate,
+        ignore_methods,
+        no_convert_floats,
+        no_prepend_enum_name,
+        no_include_path_detection,
+        fit_macro_constant_types,
+        opaque_type,
+        output,
+        raw_line,
+        module_raw_line,
+        rust_target,
+        use_core,
+        conservative_inline_namespaces,
+        allowlist_function,
+        generate_inline_functions,
+        allowlist_type,
+        allowlist_var,
+        allowlist_file,
+        verbose,
+        dump_preprocessed_input,
+        no_record_matches,
+        no_size_t_is_usize,
+        no_rustfmt_bindings,
+        formatter,
+        rustfmt_configuration_file,
+        no_partialeq,
+        no_copy,
+        no_debug,
+        no_default,
+        no_hash,
+        must_use_type,
+        enable_function_attribute_detection,
+        use_array_pointers_in_arguments,
+        wasm_import_module_name,
+        dynamic_loading,
+        dynamic_link_require_all,
+        prefix_link_name,
+        respect_cxx_access_specs,
+        translate_enum_integer_types,
+        c_naming,
+        explicit_padding,
+        vtable_generation,
+        sort_semantically,
+        merge_extern_blocks,
+        override_abi,
+        wrap_unsafe_ops,
+        with_derive_custom,
+        with_derive_custom_struct,
+        with_derive_custom_enum,
+        with_derive_custom_union,
+        wrap_static_fns,
+        wrap_static_fns_path,
+        wrap_static_fns_suffix,
+        default_visibility,
+        emit_diagnostics,
+        experimental: _,
+        version,
+        clang_args,
+    } = command;
 
-    let verbose = matches.is_present("verbose");
-    if matches.is_present("V") {
+    if version {
         println!(
             "bindgen {}",
             option_env!("CARGO_PKG_VERSION").unwrap_or("unknown")
@@ -604,416 +532,332 @@ where
 
     let mut builder = builder();
 
-    if let Some(header) = matches.value_of("header") {
+    if let Some(header) = header {
         builder = builder.header(header);
     } else {
         return Err(Error::new(ErrorKind::Other, "Header not found"));
     }
 
-    if matches.is_present("unstable-rust") {
-        builder = builder.rust_target(RustTarget::Nightly);
-        writeln!(
-            &mut stderr(),
-            "warning: the `--unstable-rust` option is deprecated"
-        )
-        .expect("Unable to write error message");
+    if let Some(rust_target) = rust_target {
+        builder = builder.rust_target(rust_target);
     }
 
-    if let Some(rust_target) = matches.value_of("rust-target") {
-        builder = builder.rust_target(RustTarget::from_str(rust_target)?);
+    if let Some(variant) = default_enum_style {
+        builder = builder.default_enum_style(variant);
     }
 
-    if let Some(variant) = matches.value_of("default-enum-style") {
-        builder = builder.default_enum_style(EnumVariation::from_str(variant)?)
+    for regex in bitfield_enum {
+        builder = builder.bitfield_enum(regex);
     }
 
-    if let Some(bitfields) = matches.values_of("bitfield-enum") {
-        for regex in bitfields {
-            builder = builder.bitfield_enum(regex);
-        }
+    for regex in newtype_enum {
+        builder = builder.newtype_enum(regex);
     }
 
-    if let Some(newtypes) = matches.values_of("newtype-enum") {
-        for regex in newtypes {
-            builder = builder.newtype_enum(regex);
-        }
+    for regex in newtype_global_enum {
+        builder = builder.newtype_global_enum(regex);
     }
 
-    if let Some(newtypes) = matches.values_of("newtype-global-enum") {
-        for regex in newtypes {
-            builder = builder.newtype_global_enum(regex);
-        }
+    for regex in rustified_enum {
+        builder = builder.rustified_enum(regex);
     }
 
-    if let Some(rustifieds) = matches.values_of("rustified-enum") {
-        for regex in rustifieds {
-            builder = builder.rustified_enum(regex);
-        }
+    for regex in constified_enum {
+        builder = builder.constified_enum(regex);
     }
 
-    if let Some(const_enums) = matches.values_of("constified-enum") {
-        for regex in const_enums {
-            builder = builder.constified_enum(regex);
-        }
+    for regex in constified_enum_module {
+        builder = builder.constified_enum_module(regex);
     }
 
-    if let Some(constified_mods) = matches.values_of("constified-enum-module") {
-        for regex in constified_mods {
-            builder = builder.constified_enum_module(regex);
-        }
-    }
-
-    if let Some(variant) = matches.value_of("default-macro-constant-type") {
-        builder = builder
-            .default_macro_constant_type(MacroTypeVariation::from_str(variant)?)
-    }
-
-    if let Some(variant) = matches.value_of("default-alias-style") {
+    if let Some(default_macro_constant_type) = default_macro_constant_type {
         builder =
-            builder.default_alias_style(AliasVariation::from_str(variant)?);
+            builder.default_macro_constant_type(default_macro_constant_type)
     }
 
-    if let Some(type_alias) = matches.values_of("normal-alias") {
-        for regex in type_alias {
-            builder = builder.type_alias(regex);
-        }
+    if let Some(variant) = default_alias_style {
+        builder = builder.default_alias_style(variant);
     }
 
-    if let Some(new_type) = matches.values_of("new-type-alias") {
-        for regex in new_type {
-            builder = builder.new_type_alias(regex);
-        }
+    for regex in normal_alias {
+        builder = builder.type_alias(regex);
     }
 
-    if let Some(new_type_deref) = matches.values_of("new-type-alias-deref") {
-        for regex in new_type_deref {
-            builder = builder.new_type_alias_deref(regex);
-        }
+    for regex in new_type_alias {
+        builder = builder.new_type_alias(regex);
     }
 
-    if let Some(variant) = matches.value_of("default-non-copy-union-style") {
-        builder = builder.default_non_copy_union_style(
-            NonCopyUnionStyle::from_str(variant)?,
-        );
+    for regex in new_type_alias_deref {
+        builder = builder.new_type_alias_deref(regex);
     }
 
-    if let Some(bindgen_wrapper_union) =
-        matches.values_of("bindgen-wrapper-union")
-    {
-        for regex in bindgen_wrapper_union {
-            builder = builder.bindgen_wrapper_union(regex);
-        }
+    if let Some(variant) = default_non_copy_union_style {
+        builder = builder.default_non_copy_union_style(variant);
     }
 
-    if let Some(manually_drop_union) = matches.values_of("manually-drop-union")
-    {
-        for regex in manually_drop_union {
-            builder = builder.manually_drop_union(regex);
-        }
+    for regex in bindgen_wrapper_union {
+        builder = builder.bindgen_wrapper_union(regex);
     }
 
-    if let Some(hidden_types) = matches.values_of("blocklist-type") {
-        for ty in hidden_types {
-            builder = builder.blocklist_type(ty);
-        }
+    for regex in manually_drop_union {
+        builder = builder.manually_drop_union(regex);
     }
 
-    if let Some(hidden_functions) = matches.values_of("blocklist-function") {
-        for fun in hidden_functions {
-            builder = builder.blocklist_function(fun);
-        }
+    for ty in blocklist_type {
+        builder = builder.blocklist_type(ty);
     }
 
-    if let Some(hidden_identifiers) = matches.values_of("blocklist-item") {
-        for id in hidden_identifiers {
-            builder = builder.blocklist_item(id);
-        }
+    for fun in blocklist_function {
+        builder = builder.blocklist_function(fun);
     }
 
-    if let Some(hidden_files) = matches.values_of("blocklist-file") {
-        for file in hidden_files {
-            builder = builder.blocklist_file(file);
-        }
+    for id in blocklist_item {
+        builder = builder.blocklist_item(id);
     }
 
-    if matches.is_present("builtins") {
+    for file in blocklist_file {
+        builder = builder.blocklist_file(file);
+    }
+
+    if builtins {
         builder = builder.emit_builtins();
     }
 
-    if matches.is_present("no-layout-tests") {
+    if no_layout_tests {
         builder = builder.layout_tests(false);
     }
 
-    if matches.is_present("no-derive-copy") {
+    if no_derive_copy {
         builder = builder.derive_copy(false);
     }
 
-    if matches.is_present("no-derive-debug") {
+    if no_derive_debug {
         builder = builder.derive_debug(false);
     }
 
-    if matches.is_present("impl-debug") {
+    if impl_debug {
         builder = builder.impl_debug(true);
     }
 
-    if matches.is_present("impl-partialeq") {
+    if impl_partialeq {
         builder = builder.impl_partialeq(true);
     }
 
-    if matches.is_present("with-derive-default") {
+    if with_derive_default {
         builder = builder.derive_default(true);
     }
 
-    if matches.is_present("with-derive-hash") {
+    if with_derive_hash {
         builder = builder.derive_hash(true);
     }
 
-    if matches.is_present("with-derive-partialeq") {
+    if with_derive_partialeq {
         builder = builder.derive_partialeq(true);
     }
 
-    if matches.is_present("with-derive-partialord") {
+    if with_derive_partialord {
         builder = builder.derive_partialord(true);
     }
 
-    if matches.is_present("with-derive-eq") {
+    if with_derive_eq {
         builder = builder.derive_eq(true);
     }
 
-    if matches.is_present("with-derive-ord") {
+    if with_derive_ord {
         builder = builder.derive_ord(true);
     }
 
-    if matches.is_present("no-derive-default") {
+    if no_derive_default {
         builder = builder.derive_default(false);
     }
 
-    if matches.is_present("no-prepend-enum-name") {
+    if no_prepend_enum_name {
         builder = builder.prepend_enum_name(false);
     }
 
-    if matches.is_present("no-include-path-detection") {
+    if no_include_path_detection {
         builder = builder.detect_include_paths(false);
     }
 
-    if matches.is_present("fit-macro-constant-types") {
+    if fit_macro_constant_types {
         builder = builder.fit_macro_constants(true);
     }
 
-    if matches.is_present("time-phases") {
+    if time_phases {
         builder = builder.time_phases(true);
     }
 
-    if matches.is_present("use-array-pointers-in-arguments") {
+    if use_array_pointers_in_arguments {
         builder = builder.array_pointers_in_arguments(true);
     }
 
-    if let Some(wasm_import_name) = matches.value_of("wasm-import-module-name")
-    {
+    if let Some(wasm_import_name) = wasm_import_module_name {
         builder = builder.wasm_import_module_name(wasm_import_name);
     }
 
-    if let Some(prefix) = matches.value_of("ctypes-prefix") {
+    if let Some(prefix) = ctypes_prefix {
         builder = builder.ctypes_prefix(prefix);
     }
 
-    if let Some(prefix) = matches.value_of("anon-fields-prefix") {
-        builder = builder.anon_fields_prefix(prefix);
-    }
+    builder = builder.anon_fields_prefix(anon_fields_prefix);
 
-    if let Some(what_to_generate) = matches.value_of("generate") {
-        let mut config = CodegenConfig::empty();
-        for what in what_to_generate.split(',') {
-            match what {
-                "functions" => config.insert(CodegenConfig::FUNCTIONS),
-                "types" => config.insert(CodegenConfig::TYPES),
-                "vars" => config.insert(CodegenConfig::VARS),
-                "methods" => config.insert(CodegenConfig::METHODS),
-                "constructors" => config.insert(CodegenConfig::CONSTRUCTORS),
-                "destructors" => config.insert(CodegenConfig::DESTRUCTORS),
-                otherwise => {
-                    return Err(Error::new(
-                        ErrorKind::Other,
-                        format!("Unknown generate item: {}", otherwise),
-                    ));
-                }
-            }
-        }
+    if let Some(config) = generate {
         builder = builder.with_codegen_config(config);
     }
 
-    if matches.is_present("emit-clang-ast") {
+    if emit_clang_ast {
         builder = builder.emit_clang_ast();
     }
 
-    if matches.is_present("emit-ir") {
+    if emit_ir {
         builder = builder.emit_ir();
     }
 
-    if let Some(path) = matches.value_of("emit-ir-graphviz") {
+    if let Some(path) = emit_ir_graphviz {
         builder = builder.emit_ir_graphviz(path);
     }
 
-    if matches.is_present("enable-cxx-namespaces") {
+    if enable_cxx_namespaces {
         builder = builder.enable_cxx_namespaces();
     }
 
-    if matches.is_present("enable-function-attribute-detection") {
+    if enable_function_attribute_detection {
         builder = builder.enable_function_attribute_detection();
     }
 
-    if matches.is_present("disable-name-namespacing") {
+    if disable_name_namespacing {
         builder = builder.disable_name_namespacing();
     }
 
-    if matches.is_present("disable-nested-struct-naming") {
+    if disable_nested_struct_naming {
         builder = builder.disable_nested_struct_naming();
     }
 
-    if matches.is_present("disable-untagged-union") {
+    if disable_untagged_union {
         builder = builder.disable_untagged_union();
     }
 
-    if matches.is_present("disable-header-comment") {
+    if disable_header_comment {
         builder = builder.disable_header_comment();
     }
 
-    if matches.is_present("ignore-functions") {
+    if ignore_functions {
         builder = builder.ignore_functions();
     }
 
-    if matches.is_present("ignore-methods") {
+    if ignore_methods {
         builder = builder.ignore_methods();
     }
 
-    if matches.is_present("no-convert-floats") {
+    if no_convert_floats {
         builder = builder.no_convert_floats();
     }
 
-    if matches.is_present("no-doc-comments") {
+    if no_doc_comments {
         builder = builder.generate_comments(false);
     }
 
-    if matches.is_present("no-recursive-allowlist") {
+    if no_recursive_allowlist {
         builder = builder.allowlist_recursively(false);
     }
 
-    if matches.is_present("objc-extern-crate") {
+    if objc_extern_crate {
         builder = builder.objc_extern_crate(true);
     }
 
-    if matches.is_present("generate-block") {
+    if generate_block {
         builder = builder.generate_block(true);
     }
 
-    if matches.is_present("block-extern-crate") {
+    if block_extern_crate {
         builder = builder.block_extern_crate(true);
     }
 
-    if let Some(opaque_types) = matches.values_of("opaque-type") {
-        for ty in opaque_types {
-            builder = builder.opaque_type(ty);
-        }
+    for ty in opaque_type {
+        builder = builder.opaque_type(ty);
     }
 
-    if let Some(lines) = matches.values_of("raw-line") {
-        for line in lines {
-            builder = builder.raw_line(line);
-        }
+    for line in raw_line {
+        builder = builder.raw_line(line);
     }
 
-    if let Some(mut values) = matches.values_of("module-raw-line") {
-        while let Some(module) = values.next() {
-            let line = values.next().unwrap();
-            builder = builder.module_raw_line(module, line);
-        }
+    let mut values = module_raw_line.into_iter();
+    while let Some(module) = values.next() {
+        let line = values.next().unwrap();
+        builder = builder.module_raw_line(module, line);
     }
 
-    if matches.is_present("use-core") {
+    if use_core {
         builder = builder.use_core();
     }
 
-    if matches.is_present("distrust-clang-mangling") {
+    if distrust_clang_mangling {
         builder = builder.trust_clang_mangling(false);
     }
 
-    if matches.is_present("conservative-inline-namespaces") {
+    if conservative_inline_namespaces {
         builder = builder.conservative_inline_namespaces();
     }
 
-    if matches.is_present("generate-inline-functions") {
+    if generate_inline_functions {
         builder = builder.generate_inline_functions(true);
     }
 
-    if let Some(allowlist) = matches.values_of("allowlist-function") {
-        for regex in allowlist {
-            builder = builder.allowlist_function(regex);
-        }
+    for regex in allowlist_function {
+        builder = builder.allowlist_function(regex);
     }
 
-    if let Some(allowlist) = matches.values_of("allowlist-type") {
-        for regex in allowlist {
-            builder = builder.allowlist_type(regex);
-        }
+    for regex in allowlist_type {
+        builder = builder.allowlist_type(regex);
     }
 
-    if let Some(allowlist) = matches.values_of("allowlist-var") {
-        for regex in allowlist {
-            builder = builder.allowlist_var(regex);
-        }
+    for regex in allowlist_var {
+        builder = builder.allowlist_var(regex);
     }
 
-    if let Some(hidden_files) = matches.values_of("allowlist-file") {
-        for file in hidden_files {
-            builder = builder.allowlist_file(file);
-        }
+    for file in allowlist_file {
+        builder = builder.allowlist_file(file);
     }
 
-    if let Some(args) = matches.values_of("clang-args") {
-        for arg in args {
-            builder = builder.clang_arg(arg);
-        }
+    for arg in clang_args {
+        builder = builder.clang_arg(arg);
     }
 
-    let output = if let Some(path) = matches.value_of("output") {
+    let output = if let Some(path) = &output {
         let file = File::create(path)?;
-        if let Some(depfile) = matches.value_of("depfile") {
+        if let Some(depfile) = depfile {
             builder = builder.depfile(path, depfile);
         }
         Box::new(io::BufWriter::new(file)) as Box<dyn io::Write>
     } else {
-        if let Some(depfile) = matches.value_of("depfile") {
+        if let Some(depfile) = depfile {
             builder = builder.depfile("-", depfile);
         }
         Box::new(io::BufWriter::new(io::stdout())) as Box<dyn io::Write>
     };
 
-    if matches.is_present("dump-preprocessed-input") {
+    if dump_preprocessed_input {
         builder.dump_preprocessed_input()?;
     }
 
-    if matches.is_present("no-record-matches") {
+    if no_record_matches {
         builder = builder.record_matches(false);
     }
 
-    if matches.is_present("no-size_t-is-usize") {
+    if no_size_t_is_usize {
         builder = builder.size_t_is_usize(false);
     }
 
-    let no_rustfmt_bindings = matches.is_present("no-rustfmt-bindings");
     if no_rustfmt_bindings {
-        builder = builder.rustfmt_bindings(false);
+        builder = builder.formatter(Formatter::None);
     }
 
-    if let Some(path_str) = matches.value_of("rustfmt-configuration-file") {
-        let path = PathBuf::from(path_str);
+    if let Some(formatter) = formatter {
+        builder = builder.formatter(formatter);
+    }
 
-        if no_rustfmt_bindings {
-            return Err(Error::new(
-                ErrorKind::Other,
-                "Cannot supply both --rustfmt-configuration-file and --no-rustfmt-bindings",
-            ));
-        }
+    if let Some(path_str) = rustfmt_configuration_file {
+        let path = PathBuf::from(path_str);
 
         if !path.is_absolute() {
             return Err(Error::new(
@@ -1032,106 +876,216 @@ where
         builder = builder.rustfmt_configuration_file(Some(path));
     }
 
-    if let Some(no_partialeq) = matches.values_of("no-partialeq") {
-        for regex in no_partialeq {
-            builder = builder.no_partialeq(regex);
-        }
+    for regex in no_partialeq {
+        builder = builder.no_partialeq(regex);
     }
 
-    if let Some(no_copy) = matches.values_of("no-copy") {
-        for regex in no_copy {
-            builder = builder.no_copy(regex);
-        }
+    for regex in no_copy {
+        builder = builder.no_copy(regex);
     }
 
-    if let Some(no_debug) = matches.values_of("no-debug") {
-        for regex in no_debug {
-            builder = builder.no_debug(regex);
-        }
+    for regex in no_debug {
+        builder = builder.no_debug(regex);
     }
 
-    if let Some(no_default) = matches.values_of("no-default") {
-        for regex in no_default {
-            builder = builder.no_default(regex);
-        }
+    for regex in no_default {
+        builder = builder.no_default(regex);
     }
 
-    if let Some(no_hash) = matches.values_of("no-hash") {
-        for regex in no_hash {
-            builder = builder.no_hash(regex);
-        }
+    for regex in no_hash {
+        builder = builder.no_hash(regex);
     }
 
-    if let Some(must_use_type) = matches.values_of("must-use-type") {
-        for regex in must_use_type {
-            builder = builder.must_use_type(regex);
-        }
+    for regex in must_use_type {
+        builder = builder.must_use_type(regex);
     }
 
-    if let Some(dynamic_library_name) = matches.value_of("dynamic-loading") {
+    if let Some(dynamic_library_name) = dynamic_loading {
         builder = builder.dynamic_library_name(dynamic_library_name);
     }
 
-    if matches.is_present("dynamic-link-require-all") {
+    if dynamic_link_require_all {
         builder = builder.dynamic_link_require_all(true);
     }
 
-    if matches.is_present("respect-cxx-access-specs") {
+    if let Some(prefix_link_name) = prefix_link_name {
+        #[derive(Debug)]
+        struct PrefixLinkNameCallback {
+            prefix: String,
+        }
+
+        impl bindgen::callbacks::ParseCallbacks for PrefixLinkNameCallback {
+            fn generated_link_name_override(
+                &self,
+                item_info: bindgen::callbacks::ItemInfo<'_>,
+            ) -> Option<String> {
+                let mut prefix = self.prefix.clone();
+                prefix.push_str(item_info.name);
+                Some(prefix)
+            }
+        }
+
+        builder = builder.parse_callbacks(Box::new(PrefixLinkNameCallback {
+            prefix: prefix_link_name,
+        }))
+    }
+
+    if respect_cxx_access_specs {
         builder = builder.respect_cxx_access_specs(true);
     }
 
-    if matches.is_present("translate-enum-integer-types") {
+    if translate_enum_integer_types {
         builder = builder.translate_enum_integer_types(true);
     }
 
-    if matches.is_present("c-naming") {
+    if c_naming {
         builder = builder.c_naming(true);
     }
 
-    if matches.is_present("explicit-padding") {
+    if explicit_padding {
         builder = builder.explicit_padding(true);
     }
 
-    if matches.is_present("use-specific-virtual-function-receiver") {
+    if use_specific_virtual_function_receiver {
         builder = builder.use_specific_virtual_function_receiver(true);
     }
 
-    if matches.is_present("represent-cxx-operators") {
+    if represent_cxx_operators {
         builder = builder.represent_cxx_operators(true);
     }
 
-    if matches.is_present("cpp-semantic-attributes") {
+    if cpp_semantic_attributes {
         builder = builder.cpp_semantic_attributes(true);
     }
 
-    if matches.is_present("use-distinct-char16-t") {
+    if use_distinct_char16_t
         builder = builder.use_distinct_char16_t(true);
     }
 
-    if matches.is_present("vtable-generation") {
+    if vtable_generation {
         builder = builder.vtable_generation(true);
     }
 
-    let verbose = matches.is_present("verbose");
-
-    if matches.is_present("sort-semantically") {
+    if sort_semantically {
         builder = builder.sort_semantically(true);
     }
 
-    if matches.is_present("merge-extern-blocks") {
+    if merge_extern_blocks {
         builder = builder.merge_extern_blocks(true);
     }
 
-    if let Some(abi_overrides) = matches.values_of("override-abi") {
-        for abi_override in abi_overrides {
-            let (regex, abi_str) = abi_override
-                .rsplit_once("=")
-                .expect("Invalid ABI override: Missing `=`");
-            let abi = abi_str
-                .parse()
-                .unwrap_or_else(|err| panic!("Invalid ABI override: {}", err));
-            builder = builder.override_abi(abi, regex);
+    for abi_override in override_abi {
+        let (regex, abi_str) = abi_override
+            .rsplit_once('=')
+            .expect("Invalid ABI override: Missing `=`");
+        let abi = abi_str
+            .parse()
+            .unwrap_or_else(|err| panic!("Invalid ABI override: {}", err));
+        builder = builder.override_abi(abi, regex);
+    }
+
+    if wrap_unsafe_ops {
+        builder = builder.wrap_unsafe_ops(true);
+    }
+
+    #[derive(Debug)]
+    struct CustomDeriveCallback {
+        derives: Vec<String>,
+        kind: Option<TypeKind>,
+        regex_set: bindgen::RegexSet,
+    }
+
+    impl bindgen::callbacks::ParseCallbacks for CustomDeriveCallback {
+        fn cli_args(&self) -> Vec<String> {
+            let mut args = vec![];
+
+            let flag = match &self.kind {
+                None => "--with-derive-custom",
+                Some(TypeKind::Struct) => "--with-derive-custom-struct",
+                Some(TypeKind::Enum) => "--with-derive-custom-enum",
+                Some(TypeKind::Union) => "--with-derive-custom-union",
+            };
+
+            let derives = self.derives.join(",");
+
+            for item in self.regex_set.get_items() {
+                args.extend_from_slice(&[
+                    flag.to_owned(),
+                    format!("{}={}", item, derives),
+                ]);
+            }
+
+            args
         }
+
+        fn add_derives(
+            &self,
+            info: &bindgen::callbacks::DeriveInfo<'_>,
+        ) -> Vec<String> {
+            if self.kind.map(|kind| kind == info.kind).unwrap_or(true) &&
+                self.regex_set.matches(info.name)
+            {
+                return self.derives.clone();
+            }
+            vec![]
+        }
+    }
+
+    for (custom_derives, kind, name) in [
+        (with_derive_custom, None, "--with-derive-custom"),
+        (
+            with_derive_custom_struct,
+            Some(TypeKind::Struct),
+            "--with-derive-custom-struct",
+        ),
+        (
+            with_derive_custom_enum,
+            Some(TypeKind::Enum),
+            "--with-derive-custom-enum",
+        ),
+        (
+            with_derive_custom_union,
+            Some(TypeKind::Union),
+            "--with-derive-custom-union",
+        ),
+    ] {
+        let name = emit_diagnostics.then_some(name);
+        for custom_derive in custom_derives {
+            let (regex, derives) = custom_derive
+                .rsplit_once('=')
+                .expect("Invalid custom derive argument: Missing `=`");
+            let derives = derives.split(',').map(|s| s.to_owned()).collect();
+
+            let mut regex_set = RegexSet::new();
+            regex_set.insert(regex);
+            regex_set.build_with_diagnostics(false, name);
+
+            builder = builder.parse_callbacks(Box::new(CustomDeriveCallback {
+                derives,
+                kind,
+                regex_set,
+            }));
+        }
+    }
+
+    if wrap_static_fns {
+        builder = builder.wrap_static_fns(true);
+    }
+
+    if let Some(path) = wrap_static_fns_path {
+        builder = builder.wrap_static_fns_path(path);
+    }
+
+    if let Some(suffix) = wrap_static_fns_suffix {
+        builder = builder.wrap_static_fns_suffix(suffix);
+    }
+
+    if let Some(visibility) = default_visibility {
+        builder = builder.default_visibility(visibility);
+    }
+
+    if emit_diagnostics {
+        builder = builder.emit_diagnostics();
     }
 
     Ok((builder, output, verbose))

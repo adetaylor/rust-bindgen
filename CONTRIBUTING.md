@@ -8,10 +8,11 @@ and introduce yourself.
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 
-
 - [Code of Conduct](#code-of-conduct)
 - [Filing an Issue](#filing-an-issue)
 - [Looking to Start Contributing to `bindgen`?](#looking-to-start-contributing-to-bindgen)
+- [Prerequisites](#prerequisites)
+  - [`rustfmt` / `cargo fmt`](#rustfmt--cargo-fmt)
 - [Building](#building)
 - [Testing](#testing)
   - [Overview](#overview)
@@ -24,6 +25,7 @@ and introduce yourself.
   - [Fuzzing `bindgen` with `csmith`](#fuzzing-bindgen-with-csmith)
   - [Property tests for `bindgen` with `quickchecking`](#property-tests-for-bindgen-with-quickchecking)
 - [Code Overview](#code-overview)
+  - [Implementing new options using `syn`](#implementing-new-options-using-syn)
 - [Pull Requests and Code Reviews](#pull-requests-and-code-reviews)
 - [Generating Graphviz Dot Files](#generating-graphviz-dot-files)
 - [Debug Logging](#debug-logging)
@@ -31,6 +33,11 @@ and introduce yourself.
   - [Getting `creduce`](#getting-creduce)
   - [Isolating Your Test Case](#isolating-your-test-case)
   - [Writing a Predicate Script](#writing-a-predicate-script)
+- [Cutting a new bindgen release](#cutting-a-new-bindgen-release)
+  - [Updating the changelog](#updating-the-changelog)
+  - [Bumping the version numbers.](#bumping-the-version-numbers)
+  - [Merge to `main`](#merge-to-main)
+  - [Publish and add a git tag for the right commit](#publish-and-add-a-git-tag-for-the-right-commit)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -58,6 +65,16 @@ issue, provide us with:
 * [Issues labeled "help wanted"](https://github.com/rust-lang/rust-bindgen/labels/help%20wanted)
 * Still can't find something to work on? [Drop a comment here](https://github.com/rust-lang/rust-bindgen/issues/747)
 
+## Prerequisites
+
+### `rustfmt` / `cargo fmt`
+
+We use `nightly` channel for `rustfmt` so please set the appropriate setting your editor/IDE for that.
+
+For rust-analyzer, you can set `rustfmt.extraArgs = ['+nightly']`.
+
+To check via command line, you can run `cargo +nightly fmt --check`.
+
 ## Building
 
 To build the `bindgen` library and the `bindgen` executable:
@@ -74,22 +91,14 @@ versions of llvm, or specify the path of the desired libclang explicitly:
 $ export LIBCLANG_PATH=path/to/clang-9.0/lib
 ```
 
-Additionally, you may want to build and test with the `testing_only_docs`
-feature to ensure that you aren't forgetting to document types and functions. CI
-will catch it if you forget, but the turn around will be a lot slower ;)
-
-```
-$ cargo build --features testing_only_docs
-```
-
 ## Testing
 
 ### Overview
 
-Input C/C++ test headers reside in the `tests/headers` directory. Expected
-output Rust bindings live in `tests/expectations/tests`. For example,
-`tests/headers/my_header.h`'s expected generated Rust bindings would be
-`tests/expectations/tests/my_header.rs`.
+Input C/C++ test headers reside in the `bindgen-tests/tests/headers` directory. Expected
+output Rust bindings live in `bindgen-tests/tests/expectations/tests`. For example,
+`bindgen-tests/tests/headers/my_header.h`'s expected generated Rust bindings would be
+`bindgen-tests/tests/expectations/tests/my_header.rs`.
 
 There are also some integration tests in the `./bindgen-integration` crate, which uses `bindgen` to
 generate bindings to some C++ code, and then uses the bindings, asserting that
@@ -109,8 +118,8 @@ These steps must be performed manually when needed.
 
 ### Testing Bindings Generation
 
-To regenerate bindings from the corpus of test headers in `tests/headers` and
-compare them against the expected bindings in `tests/expectations/tests`, run:
+To regenerate bindings from the corpus of test headers in `bindgen-tests/tests/headers` and
+compare them against the expected bindings in `bindgen-tests/tests/expectations/tests`, run:
 
 ```
 $ cargo test
@@ -139,14 +148,14 @@ those.
 ### Testing Generated Bindings
 
 If your local changes are introducing expected modifications in the
-`tests/expectations/tests/*` bindings files, then you should test that the
+`bindgen-tests/tests/expectations/tests/*` bindings files, then you should test that the
 generated bindings files still compile, and that their struct layout tests still
 pass. Also, run the integration tests (see below).
 
 You can do this with these commands:
 
 ```
-$ cd tests/expectations
+$ cd bindgen-tests/tests/expectations
 $ cargo test
 ```
 
@@ -157,12 +166,12 @@ is a dependency for running `test-one.sh`.
 
 Sometimes its useful to work with one test header from start (generating
 bindings for it) to finish (compiling the bindings and running their layout
-tests). This can be done with the `tests/test-one.sh` script. It supports fuzzy
+tests). This can be done with the `bindgen-tests/tests/test-one.sh` script. It supports fuzzy
 searching for test headers. For example, to test
 `tests/headers/what_is_going_on.hpp`, execute this command:
 
 ```
-$ ./tests/test-one.sh going
+$ ./bindgen-tests/tests/test-one.sh going
 ```
 
 Note that `test-one.sh` does not recompile `bindgen`, so if you change the code,
@@ -170,9 +179,9 @@ you'll need to rebuild it before running the script again.
 
 ### Authoring New Tests
 
-To add a new test header to the suite, simply put it in the `tests/headers`
+To add a new test header to the suite, simply put it in the `bindgen-tests/tests/headers`
 directory. Next, run `bindgen` to generate the initial expected output Rust
-bindings. Put those in `tests/expectations/tests`.
+bindings. Put those in `bindgen-tests/tests/expectations/tests`.
 
 If your new test requires certain flags to be passed to `bindgen`, you can
 specify them at the top of the test header, with a comment like this:
@@ -186,7 +195,7 @@ specify them at the top of the test header, with a comment like this:
 Then verify the new Rust bindings compile and pass their layout tests:
 
 ```
-$ cd tests/expectations
+$ cd bindgen-tests/tests/expectations
 $ cargo test new_test_header
 ```
 
@@ -195,11 +204,11 @@ $ cargo test new_test_header
 If a test generates different bindings across different `libclang` versions (for
 example, because we take advantage of better/newer APIs when possible), then you
 can add multiple test expectations, one for each supported `libclang`
-version. Instead of having a single `tests/expectations/tests/my_test.rs` file,
+version. Instead of having a single `bindgen-tests/tests/expectations/tests/my_test.rs` file,
 add each of:
 
-* `tests/expectations/tests/libclang-9/my_test.rs`
-* `tests/expectations/tests/libclang-5/my_test.rs`
+* `bindgen-tests/tests/expectations/tests/libclang-9/my_test.rs`
+* `bindgen-tests/tests/expectations/tests/libclang-5/my_test.rs`
 
 If you need to update the test expectations for a test file that generates
 different bindings for different `libclang` versions, you *don't* need to have
@@ -336,7 +345,7 @@ the `codegen::postprocessing` module by following these steps:
 
 Ensure that each commit stands alone, and passes tests. This enables better `git
 bisect`ing when needed. If your commits do not stand on their own, then rebase
-them on top of the latest master and squash them into a single commit.
+them on top of the latest main and squash them into a single commit.
 
 All pull requests undergo code review before merging. To request review, comment
 `r? @github_username_of_reviewer`. They we will respond with `r+` to approve the
@@ -419,7 +428,7 @@ $ brew install creduce
 $ # Etc...
 ```
 
-Otherwise, follow [these instructions](https://github.com/csmith-project/creduce/blob/master/INSTALL.md) for building and/or installing `creduce`.
+Otherwise, follow [these instructions](https://github.com/csmith-project/creduce/blob/main/INSTALL.md) for building and/or installing `creduce`.
 
 Running `creduce` requires two things:
 
@@ -518,3 +527,49 @@ case down to 5 lines.
 Happy bug hunting and test case reducing!
 
 [More information on using `creduce`.](https://embed.cs.utah.edu/creduce/using/)
+
+## Cutting a new bindgen release
+
+To cut a release, the following needs to happen:
+
+### Updating the changelog
+
+Update the CHANGELOG.md file with the changes from the last release. Something
+like the following is a useful way to check what has landed:
+
+ ```
+ $ git log --oneline v0.62.0..HEAD
+ ```
+
+Also worth checking the [next-release tag](https://github.com/rust-lang/rust-bindgen/pulls?q=is%3Apr+label%3Anext-release).
+
+Once that's done and the changelog is up-to-date, run `doctoc` on it.
+
+If needed, install it locally by running:
+
+```
+$ npm install doctoc
+$ ./node_modules/doctoc/doctoc.js CHANGELOG.md
+```
+
+### Bumping the version numbers.
+
+Bump version numbers as needed. Run tests just to ensure everything is working
+as expected.
+
+### Merge to `main`
+
+For regular releases, the changes above should end up in `main` before
+publishing. For dot-releases of an old version (e.g., cherry-picking an
+important fix) you can skip this.
+
+### Publish and add a git tag for the right commit
+
+Once you're in the right commit, do:
+
+```
+$ git tag -a v0.62.1 # With the right version of course
+$ pushd bindgen && cargo publish && popd
+$ pushd bindgen-cli && cargo publish && popd
+$ git push --tags upstream # To publish the tag
+```
