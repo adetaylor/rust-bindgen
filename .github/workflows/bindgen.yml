@@ -3,10 +3,10 @@ name: bindgen
 on:
   push:
     branches:
-      - master
+      - main
   pull_request:
     branches:
-      - master
+      - main
 
 jobs:
   rustfmt-clippy:
@@ -48,11 +48,45 @@ jobs:
           profile: minimal
           # MSRV below is documented in Cargo.toml and README.md, please update those if you
           # change this.
-          toolchain: 1.57.0
+          toolchain: 1.60.0
           override: true
 
       - name: Build with msrv
-        run: rm Cargo.lock && cargo +1.57.0 build --lib
+        run: rm Cargo.lock && cargo +1.60.0 build --lib
+
+  minimal:
+    runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: -D warnings
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install stable
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - name: Check without default features 
+        run: cargo check -p bindgen --no-default-features --features=runtime 
+
+  docs:
+    runs-on: ubuntu-latest
+    env:
+      RUSTDOCFLAGS: -D warnings
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install stable
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - name: Generate documentation 
+        run: cargo doc --document-private-items 
 
   quickchecking:
     runs-on: ubuntu-latest
@@ -107,7 +141,6 @@ jobs:
         # `static` feature is not testable atm.
         feature_runtime: [0, 1]
         feature_extra_asserts: [0]
-        feature_testing_only_docs: [0]
 
         include:
           # Test with extra asserts + docs just with latest llvm versions to
@@ -117,7 +150,6 @@ jobs:
             release_build: 0
             no_default_features: 0
             feature_extra_asserts: 1
-            feature_testing_only_docs: 1
 
           # FIXME: Seems installing multiarch packages fails:
           #
@@ -132,7 +164,6 @@ jobs:
           #   main_tests: 0
           #   release_build: 0
           #   feature_extra_asserts: 0
-          #   feature_testing_only_docs: 0
 
           # Ensure stuff works on macos too
           - os: macos-latest
@@ -140,7 +171,6 @@ jobs:
             release_build: 0
             no_default_features: 0
             feature_extra_asserts: 0
-            feature_testing_only_docs: 0
     steps:
       - uses: actions/checkout@v3
 
@@ -166,7 +196,11 @@ jobs:
           toolchain: stable
           target: ${{matrix.target.rust}}
           override: true
-
+      - name: Install libtinfo
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install libtinfo5
       - name: Run all the tests
         env:
           GITHUB_ACTIONS_OS: ${{matrix.os}}
@@ -177,7 +211,6 @@ jobs:
           BINDGEN_RELEASE_BUILD: ${{matrix.release_build}}
           BINDGEN_FEATURE_RUNTIME: ${{matrix.feature_runtime}}
           BINDGEN_FEATURE_EXTRA_ASSERTS: ${{matrix.feature_extra_asserts}}
-          BINDGEN_FEATURE_TESTING_ONLY_DOCS: ${{matrix.feature_testing_only_docs}}
           BINDGEN_NO_DEFAULT_FEATURES: ${{matrix.no_default_features}}
         run: ./ci/test.sh
 
