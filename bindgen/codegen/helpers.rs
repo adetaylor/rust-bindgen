@@ -131,7 +131,7 @@ pub trait CppSemanticAttributeCreator {
         })
     }
 
-    fn field_type_reference(&mut self) {
+    fn reference(&mut self) {
         self.add_ident("reference")
     }
 

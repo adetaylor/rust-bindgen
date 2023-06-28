@@ -915,21 +915,21 @@ impl CodeGenerator for Type {
                     item.used_template_params(ctx);
 
                 let is_opaque = item.is_opaque(ctx, &());
-                let inner_rust_type = if is_opaque {
+                let (inner_rust_type, annotations) = if is_opaque {
                     outer_params = vec![];
-                    self.to_opaque(ctx, item)
+                    (self.to_opaque(ctx, item), RustTyAnnotation::None)
                 } else {
                     // Its possible that we have better layout information than
                     // the inner type does, so fall back to an opaque blob based
                     // on our layout if converting the inner item fails.
-                    let (mut inner_ty, _) = inner_item
+                    let (mut inner_ty, annotations) = inner_item
                         .try_to_rust_ty_or_opaque(ctx, &())
                         .map(|ty| ty.into_outer_type())
                         .unwrap_or_else(|_| {
                             (self.to_opaque(ctx, item), RustTyAnnotation::None)
                         });
                     inner_ty.append_implicit_template_params(ctx, inner_item);
-                    inner_ty
+                    (inner_ty, annotations)
                 };
 
                 {
@@ -972,6 +972,9 @@ impl CodeGenerator for Type {
                 // because that information will be recorded against the definition of Y.
                 if has_unused_template_args {
                     semantic_annotations.discards_template_param();
+                }
+                if matches!(annotations, RustTyAnnotation::Reference) {
+                    semantic_annotations.reference();
                 }
                 tokens.append_all(semantic_annotations.result());
 
@@ -1493,7 +1496,7 @@ impl<'a> FieldCodegen<'a> for FieldData {
         let mut csaa =
             CppSemanticAttributeAdder::new(ctx.options(), &mut attributes);
         match ty_annotations {
-            RustTyAnnotation::Reference => csaa.field_type_reference(),
+            RustTyAnnotation::Reference => csaa.reference(),
             RustTyAnnotation::RValueReference => {
                 csaa.field_type_rvalue_reference()
             }
