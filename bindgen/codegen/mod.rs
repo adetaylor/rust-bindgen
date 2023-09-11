@@ -973,6 +973,7 @@ impl CodeGenerator for Type {
                 if has_unused_template_args {
                     semantic_annotations.discards_template_param();
                 }
+                semantic_annotations.location(item.location());
                 tokens.append_all(semantic_annotations.result());
 
                 let alias_style = if ctx.options().type_alias.matches(&name) {
@@ -2229,6 +2230,7 @@ impl CodeGenerator for CompInfo {
         if let Some(layout) = layout {
             semantic_annotations.layout(&layout);
         }
+        semantic_annotations.location(item.location());
 
         if ctx.options().rust_features().repr_align {
             if let Some(explicit) = explicit_align {
@@ -3293,6 +3295,7 @@ impl CodeGenerator for Enum {
             }
         }
         semantic_annotations.visibility(self.visibility);
+        semantic_annotations.location(item.location());
 
         // TODO(emilio): Delegate this to the builders?
         match variation {
@@ -4471,6 +4474,7 @@ impl CodeGenerator for Function {
         }
 
         semantic_annotations.visibility(self.visibility());
+        semantic_annotations.location(item.location());
 
         let abi = match signature.abi(ctx, Some(name)) {
             ClangAbi::Known(Abi::ThisCall)

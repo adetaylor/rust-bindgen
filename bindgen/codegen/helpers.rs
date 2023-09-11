@@ -79,7 +79,7 @@ pub(crate) mod attributes {
     }
 }
 
-pub trait CppSemanticAttributeCreator {
+pub(crate) trait CppSemanticAttributeCreator {
     fn do_add(&mut self, ts: TokenStream);
     fn is_enabled(&self) -> bool;
 
@@ -188,6 +188,29 @@ pub trait CppSemanticAttributeCreator {
         self.add(quote! {
             layout(#sz, #align, #packed)
         })
+    }
+
+    fn location(&mut self,
+        location: Option<&crate::clang::SourceLocation>,
+    ) {
+        if let Some(location) = location {
+            let (file, line, col, byte_offset) = location.location();
+            let file = file.name();
+            if let Some(filename) = file {
+                self.add(quote! {
+                    source_file(#filename)
+                });
+                self.add(quote! {
+                    source_col(#col)
+                });
+                self.add(quote! {
+                    source_line(#line)
+                });
+                self.add(quote! {
+                    byte_offset(#byte_offset)
+                });
+            }
+        }
     }
 }
 
