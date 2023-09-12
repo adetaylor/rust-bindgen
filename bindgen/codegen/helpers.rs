@@ -195,19 +195,13 @@ pub(crate) trait CppSemanticAttributeCreator {
     ) {
         if let Some(location) = location {
             let (file, line, col, byte_offset) = location.location();
+            let line = ast_ty::int_expr(line as i64);
+            let col = ast_ty::int_expr(col as i64);
+            let byte_offset = ast_ty::int_expr(byte_offset as i64);
             let file = file.name();
             if let Some(filename) = file {
                 self.add(quote! {
-                    source_file(#filename)
-                });
-                self.add(quote! {
-                    source_col(#col)
-                });
-                self.add(quote! {
-                    source_line(#line)
-                });
-                self.add(quote! {
-                    byte_offset(#byte_offset)
+                    source_location(#filename, #line, #col, #byte_offset)
                 });
             }
         }
