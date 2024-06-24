@@ -1,28 +1,13 @@
-#![allow(
-    dead_code,
-    non_snake_case,
-    non_camel_case_types,
-    non_upper_case_globals
-)]
-
+#![allow(dead_code, non_snake_case, non_camel_case_types, non_upper_case_globals)]
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct BitStream {
     pub _address: u8,
 }
-#[test]
-fn bindgen_test_layout_BitStream() {
-    assert_eq!(
-        ::std::mem::size_of::<BitStream>(),
-        1usize,
-        concat!("Size of: ", stringify!(BitStream))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<BitStream>(),
-        1usize,
-        concat!("Alignment of ", stringify!(BitStream))
-    );
-}
+const _: () = {
+    ["Size of BitStream"][::std::mem::size_of::<BitStream>() - 1usize];
+    ["Alignment of BitStream"][::std::mem::align_of::<BitStream>() - 1usize];
+};
 extern "C" {
     #[link_name = "\u{1}_ZN9BitStream5WriteEPKcj"]
     pub fn BitStream_Write(

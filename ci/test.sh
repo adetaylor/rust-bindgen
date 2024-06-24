@@ -9,20 +9,22 @@ set -x
 set -o pipefail
 
 function llvm_linux_target_triple() {
-  echo "x86_64-linux-gnu-ubuntu-16.04"
+  case "$1" in
+    9.0.1)  echo "x86_64-linux-gnu-ubuntu-16.04" ;;
+    *)      echo "x86_64-linux-gnu-ubuntu-18.04" ;;
+  esac
 }
 
 function llvm_macos_target_triple() {
   case "$1" in
-    [0-8].* | 9.0.0)    echo "x86_64-darwin-apple" ;;
-    # Starting with 9.0.1, triple swapped ordering
-    *)                  echo "x86_64-apple-darwin" ;;
+    9.0.1)  echo "x86_64-apple-darwin" ;;
+    *)      echo "arm64-apple-darwin22.0" ;;
   esac
 }
 
 function llvm_version_triple() {
   case "$1" in
-    5.0) echo "5.0.1" ;;
+    9.0) echo "9.0.1" ;;
     # By default, take the .0 patch release
     *)   echo "$1.0"  ;;
   esac
@@ -30,16 +32,7 @@ function llvm_version_triple() {
 
 function llvm_base_url() {
   local llvm_version_triple=$1
-
-  case "$llvm_version_triple" in
-    [0-8].* | 9.0.0)
-      echo "http://releases.llvm.org/$llvm_version_triple"
-      ;;
-    # Starting with 9.0.1, releases are hosted on github
-    *)
-      echo "https://github.com/llvm/llvm-project/releases/download/llvmorg-$llvm_version_triple"
-      ;;
-  esac
+  echo "https://github.com/llvm/llvm-project/releases/download/llvmorg-$llvm_version_triple"
 }
 
 function llvm_download() {
@@ -75,14 +68,6 @@ set_llvm_env() {
   fi
 }
 
-# Need rustfmt to compare the test expectations.
-set_rustfmt_env() {
-  local toolchain="nightly-$(curl https://rust-lang.github.io/rustup-components-history/$(rustup target list --installed | tail -1)/rustfmt)"
-  rustup update "$toolchain"
-  rustup component add rustfmt --toolchain "$toolchain"
-  export RUSTFMT="$(rustup which --toolchain "$toolchain" rustfmt)"
-}
-
 assert_no_diff() {
   git add -u
   git diff @
@@ -90,7 +75,6 @@ assert_no_diff() {
 }
 
 set_llvm_env
-set_rustfmt_env
 
 get_cargo_args() {
   local args=""
@@ -108,7 +92,7 @@ get_cargo_args() {
     features+="runtime"
   fi
   if [ "$BINDGEN_FEATURE_EXTRA_ASSERTS" == "1"  ]; then
-    features+=" testing_only_extra_assertions"
+    features+=" __testing_only_extra_assertions"
   fi
   if [ ! -z "$features" ]; then
     args+=" --features $(echo $features | tr ' ' ',')"

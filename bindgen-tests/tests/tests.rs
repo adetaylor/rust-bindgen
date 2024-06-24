@@ -1,17 +1,12 @@
 use autocxx_bindgen as bindgen;
-extern crate clap;
-extern crate diff;
-#[cfg(feature = "logging")]
-extern crate env_logger;
-extern crate shlex;
-
 use bindgen::{clang_version, Builder};
+use owo_colors::{OwoColorize, Style};
+use similar::{ChangeTag, TextDiff};
 use std::env;
+use std::fmt;
 use std::fs;
-use std::io::{self, BufRead, BufReader, Error, ErrorKind, Read, Write};
+use std::io::{BufRead, BufReader, Error, ErrorKind, Read, Write};
 use std::path::{Path, PathBuf};
-use std::process;
-use std::sync::Once;
 
 use crate::options::builder_from_flags;
 
@@ -20,100 +15,14 @@ mod options;
 
 mod parse_callbacks;
 
-// Run `rustfmt` on the given source string and return a tuple of the formatted
-// bindings, and rustfmt's stderr.
-fn rustfmt(source: String) -> (String, String) {
-    static CHECK_RUSTFMT: Once = Once::new();
+// Format the given source string. It can fail if the source string does not contain syntactically
+// valid Rust.
+fn format_code<S: AsRef<str>>(source: S) -> syn::Result<String> {
+    use prettyplease::unparse;
+    use syn::{parse_str, File};
 
-    CHECK_RUSTFMT.call_once(|| {
-        if env::var_os("RUSTFMT").is_some() {
-            return;
-        }
-
-        let mut rustfmt = {
-            let mut p = process::Command::new("rustup");
-            p.args(["run", "nightly", "rustfmt", "--version"]);
-            p
-        };
-
-        let have_working_rustfmt = rustfmt
-            .stdout(process::Stdio::null())
-            .stderr(process::Stdio::null())
-            .status()
-            .ok()
-            .map_or(false, |status| status.success());
-
-        if !have_working_rustfmt {
-            panic!(
-                "
-The latest `rustfmt` is required to run the `bindgen` test suite. Install
-`rustfmt` with:
-
-    $ rustup update nightly
-    $ rustup component add rustfmt --toolchain nightly
-"
-            );
-        }
-    });
-
-    let mut child = match env::var_os("RUSTFMT") {
-        Some(r) => process::Command::new(r),
-        None => {
-            let mut p = process::Command::new("rustup");
-            p.args(["run", "nightly", "rustfmt"]);
-            p
-        }
-    };
-
-    let mut child = child
-        .args([
-            "--config-path",
-            concat!(env!("CARGO_MANIFEST_DIR"), "/tests/rustfmt.toml"),
-        ])
-        .stdin(process::Stdio::piped())
-        .stdout(process::Stdio::piped())
-        .stderr(process::Stdio::piped())
-        .spawn()
-        .expect("should spawn `rustup run nightly rustfmt`");
-
-    let mut stdin = child.stdin.take().unwrap();
-    let mut stdout = child.stdout.take().unwrap();
-    let mut stderr = child.stderr.take().unwrap();
-
-    // Write to stdin in a new thread, so that we can read from stdout on this
-    // thread. This keeps the child from blocking on writing to its stdout which
-    // might block us from writing to its stdin.
-    let stdin_handle =
-        ::std::thread::spawn(move || stdin.write_all(source.as_bytes()));
-
-    // Read stderr on a new thread for similar reasons.
-    let stderr_handle = ::std::thread::spawn(move || {
-        let mut output = vec![];
-        io::copy(&mut stderr, &mut output)
-            .map(|_| String::from_utf8_lossy(&output).to_string())
-    });
-
-    let mut output = vec![];
-    io::copy(&mut stdout, &mut output).expect("Should copy stdout into vec OK");
-
-    // Ignore actual rustfmt status because it is often non-zero for trivial
-    // things.
-    let _ = child.wait().expect("should wait on rustfmt child OK");
-
-    stdin_handle
-        .join()
-        .expect("writer thread should not have panicked")
-        .expect("should have written to child rustfmt's stdin OK");
-
-    let bindings = String::from_utf8(output)
-        .expect("rustfmt should only emit valid utf-8");
-
-    let stderr = stderr_handle
-        .join()
-        .expect("stderr reader thread should not have panicked")
-        .expect("should have read child rustfmt's stderr OK");
-
-    (bindings, stderr)
+    let file = parse_str::<File>(source.as_ref())?;
+    Ok(unparse(&file))
 }
 
 fn should_overwrite_expected() -> bool {
@@ -140,13 +49,7 @@ fn error_diff_mismatch(
         println!("+++ generated from: {:?}", header);
     }
 
-    for diff in diff::lines(expected, actual) {
-        match diff {
-            diff::Result::Left(l) => println!("-{}", l),
-            diff::Result::Both(l, _) => println!(" {}", l),
-            diff::Result::Right(r) => println!("+{}", r),
-        }
-    }
+    show_diff(expected, actual);
 
     if should_overwrite_expected() {
         // Overwrite the expectation with actual output.
@@ -172,6 +75,52 @@ fn error_diff_mismatch(
     Err(Error::new(ErrorKind::Other, "Header and binding differ! Run with BINDGEN_OVERWRITE_EXPECTED=1 in the environment to automatically overwrite the expectation or with BINDGEN_TESTS_DIFFTOOL=meld to do this manually."))
 }
 
+struct Line(Option<usize>);
+
+impl fmt::Display for Line {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self.0 {
+            None => write!(f, "    "),
+            Some(idx) => write!(f, "{:<4}", idx + 1),
+        }
+    }
+}
+
+fn show_diff(old: &str, new: &str) {
+    let diff = TextDiff::from_lines(old, new);
+    for (count, group) in diff.grouped_ops(3).iter().enumerate() {
+        if count > 0 {
+            let message = format!("(chunk {count}/n)");
+            println!("{}", message.cyan().dimmed());
+        }
+        for diff_op in group {
+            for change in diff.iter_inline_changes(diff_op) {
+                let (sign, color) = match change.tag() {
+                    ChangeTag::Delete => ("-", Style::new().red()),
+                    ChangeTag::Insert => ("+", Style::new().green()),
+                    ChangeTag::Equal => (" ", Style::new()),
+                };
+                print!(
+                    "{}{}| {}",
+                    Line(change.old_index()).style(color).dimmed(),
+                    Line(change.new_index()).style(color).dimmed(),
+                    sign.style(color).bold(),
+                );
+                for (emphasized, text) in change.iter_strings_lossy() {
+                    if emphasized {
+                        print!("{}", text.style(color).underline());
+                    } else {
+                        print!("{}", text.style(color));
+                    }
+                }
+                if change.missing_newline() {
+                    println!();
+                }
+            }
+        }
+    }
+}
+
 fn compare_generated_header(
     header: &Path,
     builder: BuilderState,
@@ -194,21 +143,19 @@ fn compare_generated_header(
     {
         let mut expectation = expectation.clone();
 
-        if cfg!(feature = "testing_only_libclang_9") {
+        if cfg!(feature = "__testing_only_libclang_16") {
+            expectation.push("libclang-16");
+        } else if cfg!(feature = "__testing_only_libclang_9") {
             expectation.push("libclang-9");
-        } else if cfg!(feature = "testing_only_libclang_5") {
-            expectation.push("libclang-5");
         } else {
             match clang_version().parsed {
-                None => expectation.push("libclang-9"),
+                None => expectation.push("libclang-16"),
                 Some(version) => {
                     let (maj, min) = version;
-                    let version_str = if maj >= 9 {
+                    let version_str = if maj >= 16 {
+                        "16".to_owned()
+                    } else if maj >= 9 {
                         "9".to_owned()
-                    } else if maj >= 5 {
-                        "5".to_owned()
-                    } else if maj >= 4 {
-                        "4".to_owned()
                     } else {
                         format!("{}.{}", maj, min)
                     };
@@ -237,7 +184,7 @@ fn compare_generated_header(
             BufReader::new(f).read_to_string(&mut expected)?;
         }
         None => panic!(
-            "missing test expectation file and/or 'testing_only_libclang_$VERSION' \
+            "missing test expectation file and/or '__testing_only_libclang_$VERSION' \
              feature for header '{}'; looking for expectation file at '{:?}'",
             header.display(),
             looked_at,
@@ -247,17 +194,15 @@ fn compare_generated_header(
     let (builder, roundtrip_builder) = builder.into_builder(check_roundtrip)?;
 
     // We skip the generate() error here so we get a full diff below
-    let (actual, rustfmt_stderr) = match builder.generate() {
-        Ok(bindings) => {
-            let actual = bindings.to_string();
-            rustfmt(actual)
-        }
-        Err(_) => ("/* error generating bindings */\n".into(), "".to_string()),
+    let actual = match builder.generate() {
+        Ok(bindings) => format_code(bindings.to_string()).map_err(|err| {
+            Error::new(
+                ErrorKind::Other,
+                format!("Cannot parse the generated bindings: {}", err),
+            )
+        })?,
+        Err(_) => "/* error generating bindings */\n".into(),
     };
-    println!("{}", rustfmt_stderr);
-
-    let (expected, rustfmt_stderr) = rustfmt(expected);
-    println!("{}", rustfmt_stderr);
 
     if actual.is_empty() {
         return Err(Error::new(
@@ -265,9 +210,7 @@ fn compare_generated_header(
             "Something's gone really wrong!",
         ));
     }
-
     if actual != expected {
-        println!("{}", rustfmt_stderr);
         return error_diff_mismatch(
             &actual,
             &expected,
@@ -346,7 +289,7 @@ fn create_bindgen_builder(header: &Path) -> Result<BuilderState, Error> {
                 .last()
                 .and_then(shlex::split)
                 .unwrap();
-            flags.extend(extra_flags.into_iter());
+            flags.extend(extra_flags);
         } else if line.contains("bindgen-osx-only") {
             let prepend_flags = ["--raw-line", "#![cfg(target_os=\"macos\")]"];
             flags = prepend_flags
@@ -396,10 +339,7 @@ fn create_bindgen_builder(header: &Path) -> Result<BuilderState, Error> {
         "",
     ];
 
-    let args = prepend
-        .iter()
-        .map(ToString::to_string)
-        .chain(flags.into_iter());
+    let args = prepend.iter().map(ToString::to_string).chain(flags);
 
     let mut builder = builder_from_flags(args)?.0;
     if let Some(ref parse_cb) = parse_callbacks {
@@ -445,25 +385,24 @@ fn test_clang_env_args() {
             "test.hpp",
             "#ifdef _ENV_ONE\nextern const int x[] = { 42 };\n#endif\n\
              #ifdef _ENV_TWO\nextern const int y[] = { 42 };\n#endif\n\
-             #ifdef NOT_THREE\nextern const int z[] = { 42 };\n#endif\n",
+             #if defined NOT_THREE && NOT_THREE == 1\nextern const int z[] = { 42 };\n#endif\n",
         )
         .generate()
         .unwrap()
         .to_string();
 
-    let (actual, stderr) = rustfmt(actual);
-    println!("{}", stderr);
+    let actual = format_code(actual).unwrap();
 
-    let (expected, _) = rustfmt(
+    let expected = format_code(
         "extern \"C\" {
     pub static x: [::std::os::raw::c_int; 1usize];
 }
 extern \"C\" {
     pub static y: [::std::os::raw::c_int; 1usize];
 }
-"
-        .to_string(),
-    );
+",
+    )
+    .unwrap();
 
     assert_eq!(expected, actual);
 }
@@ -478,16 +417,15 @@ fn test_header_contents() {
         .unwrap()
         .to_string();
 
-    let (actual, stderr) = rustfmt(actual);
-    println!("{}", stderr);
+    let actual = format_code(actual).unwrap();
 
-    let (expected, _) = rustfmt(
+    let expected = format_code(
         "extern \"C\" {
     pub fn foo(a: *const ::std::os::raw::c_char) -> ::std::os::raw::c_int;
 }
-"
-        .to_string(),
-    );
+",
+    )
+    .unwrap();
 
     assert_eq!(expected, actual);
 }
@@ -505,8 +443,7 @@ fn test_multiple_header_calls_in_builder() {
         .unwrap()
         .to_string();
 
-    let (actual, stderr) = rustfmt(actual);
-    println!("{}", stderr);
+    let actual = format_code(actual).unwrap();
 
     let expected_filename = concat!(
         env!("CARGO_MANIFEST_DIR"),
@@ -516,7 +453,43 @@ fn test_multiple_header_calls_in_builder() {
         env!("CARGO_MANIFEST_DIR"),
         "/tests/expectations/tests/test_multiple_header_calls_in_builder.rs"
     ));
-    let (expected, _) = rustfmt(expected.to_string());
+    let expected = format_code(expected).unwrap();
+
+    if actual != expected {
+        println!("Generated bindings differ from expected!");
+        error_diff_mismatch(
+            &actual,
+            &expected,
+            None,
+            Path::new(expected_filename),
+        )
+        .unwrap();
+    }
+}
+
+#[test]
+fn test_headers_call_in_builder() {
+    let actual = builder()
+        .headers([
+            concat!(env!("CARGO_MANIFEST_DIR"), "/tests/headers/func_ptr.h"),
+            concat!(env!("CARGO_MANIFEST_DIR"), "/tests/headers/char.h"),
+        ])
+        .clang_arg("--target=x86_64-unknown-linux")
+        .generate()
+        .unwrap()
+        .to_string();
+
+    let actual = format_code(actual).unwrap();
+
+    let expected_filename = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/expectations/tests/test_multiple_header_calls_in_builder.rs"
+    );
+    let expected = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/expectations/tests/test_multiple_header_calls_in_builder.rs"
+    ));
+    let expected = format_code(expected).unwrap();
 
     if actual != expected {
         println!("Generated bindings differ from expected!");
@@ -540,19 +513,18 @@ fn test_multiple_header_contents() {
         .unwrap()
         .to_string();
 
-    let (actual, stderr) = rustfmt(actual);
-    println!("{}", stderr);
+    let actual = format_code(actual).unwrap();
 
-    let (expected, _) = rustfmt(
+    let expected = format_code(
         "extern \"C\" {
     pub fn foo2(b: *const ::std::os::raw::c_char) -> f32;
 }
 extern \"C\" {
     pub fn foo(a: *const ::std::os::raw::c_char) -> ::std::os::raw::c_int;
 }
-"
-        .to_string(),
-    );
+",
+    )
+    .unwrap();
 
     assert_eq!(expected, actual);
 }
@@ -572,8 +544,7 @@ fn test_mixed_header_and_header_contents() {
         .unwrap()
         .to_string();
 
-    let (actual, stderr) = rustfmt(actual);
-    println!("{}", stderr);
+    let actual = format_code(actual).unwrap();
 
     let expected_filename = concat!(
         env!("CARGO_MANIFEST_DIR"),
@@ -583,7 +554,62 @@ fn test_mixed_header_and_header_contents() {
         env!("CARGO_MANIFEST_DIR"),
         "/tests/expectations/tests/test_mixed_header_and_header_contents.rs"
     ));
-    let (expected, _) = rustfmt(expected.to_string());
+    let expected = format_code(expected).unwrap();
+    if expected != actual {
+        error_diff_mismatch(
+            &actual,
+            &expected,
+            None,
+            Path::new(expected_filename),
+        )
+        .unwrap();
+    }
+}
+
+#[test]
+fn test_macro_fallback_non_system_dir() {
+    let actual = builder()
+        .header(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/macro_fallback_test_headers/one_header.h"
+        ))
+        .header(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/macro_fallback_test_headers/another_header.h"
+        ))
+        .clang_macro_fallback()
+        .clang_arg(format!("-I{}/tests/headers", env!("CARGO_MANIFEST_DIR")))
+        .generate()
+        .unwrap()
+        .to_string();
+
+    let actual = format_code(actual).unwrap();
+
+    let (expected_filename, expected) = match clang_version().parsed {
+        Some((9, _)) => {
+            let expected_filename = concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/expectations/tests/libclang-9/macro_fallback_non_system_dir.rs",
+            );
+            let expected = include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/expectations/tests/libclang-9/macro_fallback_non_system_dir.rs",
+            ));
+            (expected_filename, expected)
+        }
+        _ => {
+            let expected_filename = concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/expectations/tests/test_macro_fallback_non_system_dir.rs",
+            );
+            let expected = include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/expectations/tests/test_macro_fallback_non_system_dir.rs",
+            ));
+            (expected_filename, expected)
+        }
+    };
+    let expected = format_code(expected).unwrap();
     if expected != actual {
         error_diff_mismatch(
             &actual,
@@ -678,7 +704,7 @@ fn build_flags_output_helper(builder: &bindgen::Builder) {
 
     let flags_quoted: Vec<String> = command_line_flags
         .iter()
-        .map(|x| format!("{}", shlex::quote(x)))
+        .map(|x| format!("{}", shlex::try_quote(x).unwrap()))
         .collect();
     let flags_str = flags_quoted.join(" ");
     println!("{}", flags_str);
@@ -715,6 +741,7 @@ fn test_wrap_static_fns() {
         .header("tests/headers/wrap-static-fns.h")
         .wrap_static_fns(true)
         .wrap_static_fns_path(generated_path.display().to_string())
+        .parse_callbacks(Box::new(parse_callbacks::WrapAsVariadicFn))
         .generate()
         .expect("Failed to generate bindings");
 

@@ -10,8 +10,6 @@ like `./target/debug/build/bindgen-tutorial-bzip2-sys-afc7747d7eafd720/out/`.
 Note that the associated shared object to `bz2` is `libbz2.so`. In general, a `lib<name>.so` should be referenced in the build file by `<name>`.
 
 ```rust,ignore
-extern crate bindgen;
-
 use std::env;
 use std::path::PathBuf;
 
@@ -23,9 +21,6 @@ fn main() {
     // shared library.
     println!("cargo:rustc-link-lib=bz2");
 
-    // Tell cargo to invalidate the built crate whenever the wrapper changes
-    println!("cargo:rerun-if-changed=wrapper.h");
-
     // The bindgen::Builder is the main entry point
     // to bindgen, and lets you build up options for
     // the resulting bindings.
@@ -35,7 +30,7 @@ fn main() {
         .header("wrapper.h")
         // Tell cargo to invalidate the built crate whenever any of the
         // included header files changed.
-        .parse_callbacks(Box::new(bindgen::CargoCallbacks))
+        .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
         // Finish the builder and generate the bindings.
         .generate()
         // Unwrap the Result and panic on failure.
@@ -52,6 +47,6 @@ fn main() {
 Now, when we run `cargo build`, our bindings to `bzip2` are generated on the
 fly!
 
-[There's more info about `build.rs` files in the crates.io documentation.][build-rs]
+[There's more info about `build.rs` files in the Cargo documentation.][build-rs]
 
-[build-rs]: http://doc.crates.io/build-script.html
+[build-rs]: https://doc.rust-lang.org/cargo/reference/build-scripts.html

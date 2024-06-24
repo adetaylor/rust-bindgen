@@ -7,10 +7,10 @@ use super::item::Item;
 use super::traversal::{EdgeKind, Trace, Tracer};
 use super::ty::TypeKind;
 use crate::callbacks::{ItemInfo, ItemKind};
-use crate::clang::{self, Attribute};
+use crate::clang::{self, ABIKind, Attribute};
 use crate::parse::{ClangSubItemParser, ParseError, ParseResult};
 use clang_sys::{
-    self, CXCallingConv, CX_CXXAccessSpecifier, CX_CXXPrivate, CX_CXXProtected,
+    , CXCallingConv, CX_CXXAccessSpecifier, CX_CXXPrivate, CX_CXXProtected,
 };
 
 use quote::TokenStreamExt;
@@ -286,6 +286,8 @@ pub enum Abi {
     Win64,
     /// The "C-unwind" ABI.
     CUnwind,
+    /// The "system" ABI.
+    System,
 }
 
 impl FromStr for Abi {
@@ -302,6 +304,7 @@ impl FromStr for Abi {
             "aapcs" => Ok(Self::Aapcs),
             "win64" => Ok(Self::Win64),
             "C-unwind" => Ok(Self::CUnwind),
+            "system" => Ok(Self::System),
             _ => Err(format!("Invalid or unknown ABI {:?}", s)),
         }
     }
@@ -319,6 +322,7 @@ impl std::fmt::Display for Abi {
             Self::Aapcs => "aapcs",
             Self::Win64 => "win64",
             Self::CUnwind => "C-unwind",
+            Abi::System => "system",
         };
 
         s.fmt(f)
@@ -395,6 +399,7 @@ fn get_abi(cc: CXCallingConv) -> ClangAbi {
         CXCallingConv_X86VectorCall => ClangAbi::Known(Abi::Vectorcall),
         CXCallingConv_AAPCS => ClangAbi::Known(Abi::Aapcs),
         CXCallingConv_X86_64Win64 => ClangAbi::Known(Abi::Win64),
+        CXCallingConv_AArch64VectorCall => ClangAbi::Known(Abi::Vectorcall),
         other => ClangAbi::Unknown(other),
     }
 }
@@ -415,11 +420,12 @@ pub(crate) fn cursor_mangling(
         return None;
     }
 
+    let is_itanium_abi = ctx.abi_kind() == ABIKind::GenericItanium;
     let is_destructor = cursor.kind() == clang_sys::CXCursor_Destructor;
     if let Ok(mut manglings) = cursor.cxx_manglings() {
         while let Some(m) = manglings.pop() {
             // Only generate the destructor group 1, see below.
-            if is_destructor && !m.ends_with("D1Ev") {
+            if is_itanium_abi && is_destructor && !m.ends_with("D1Ev") {
                 continue;
             }
 
@@ -432,7 +438,7 @@ pub(crate) fn cursor_mangling(
         return None;
     }
 
-    if is_destructor {
+    if is_itanium_abi && is_destructor {
         // With old (3.8-) libclang versions, and the Itanium ABI, clang returns
         // the "destructor group 0" symbol, which means that it'll try to free
         // memory, which definitely isn't what we want.
@@ -501,6 +507,11 @@ fn args_from_ty_and_cursor(
 }
 
 impl FunctionSig {
+    /// Get the function name.
+    pub(crate) fn name(&self) -> &str {
+        &self.name
+    }
+
     /// Construct a new function signature from the given Clang type.
     pub(crate) fn from_ty(
         ty: &clang::Type,
@@ -581,10 +592,24 @@ impl FunctionSig {
                 Default::default()
             };
 
-        // This looks easy to break but the clang parser keeps the type spelling clean even if
-        // other attributes are added.
-        is_divergent =
-            is_divergent || ty.spelling().contains("__attribute__((noreturn))");
+        // Check if the type contains __attribute__((noreturn)) outside of parentheses. This is
+        // somewhat fragile, but it seems to be the only way to get at this information as of
+        // libclang 9.
+        let ty_spelling = ty.spelling();
+        let has_attribute_noreturn = ty_spelling
+            .match_indices("__attribute__((noreturn))")
+            .any(|(i, _)| {
+                let depth = ty_spelling[..i]
+                    .bytes()
+                    .filter_map(|ch| match ch {
+                        b'(' => Some(1),
+                        b')' => Some(-1),
+                        _ => None,
+                    })
+                    .sum::<isize>();
+                depth == 0
+            });
+        is_divergent = is_divergent || has_attribute_noreturn;
 
         let is_method = kind == CXCursor_CXXMethod;
         let is_constructor = kind == CXCursor_Constructor;
@@ -695,10 +720,10 @@ impl FunctionSig {
         &self,
         ctx: &BindgenContext,
         name: Option<&str>,
-    ) -> ClangAbi {
+    ) -> crate::codegen::error::Result<ClangAbi> {
         // FIXME (pvdrz): Try to do this check lazily instead. Maybe store the ABI inside `ctx`
         // instead?.
-        if let Some(name) = name {
+        let abi = if let Some(name) = name {
             if let Some((abi, _)) = ctx
                 .options()
                 .abi_overrides
@@ -718,6 +743,33 @@ impl FunctionSig {
             ClangAbi::Known(*abi)
         } else {
             self.abi
+        };
+
+        match abi {
+            ClangAbi::Known(Abi::ThisCall)
+                if !ctx.options().rust_features().thiscall_abi =>
+            {
+                Err(crate::codegen::error::Error::UnsupportedAbi("thiscall"))
+            }
+            ClangAbi::Known(Abi::Vectorcall)
+                if !ctx.options().rust_features().vectorcall_abi =>
+            {
+                Err(crate::codegen::error::Error::UnsupportedAbi("vectorcall"))
+            }
+            ClangAbi::Known(Abi::CUnwind)
+                if !ctx.options().rust_features().c_unwind_abi =>
+            {
+                Err(crate::codegen::error::Error::UnsupportedAbi("C-unwind"))
+            }
+            ClangAbi::Known(Abi::EfiApi)
+                if !ctx.options().rust_features().abi_efiapi =>
+            {
+                Err(crate::codegen::error::Error::UnsupportedAbi("efiapi"))
+            }
+            ClangAbi::Known(Abi::Win64) if self.is_variadic() => {
+                Err(crate::codegen::error::Error::UnsupportedAbi("Win64"))
+            }
+            abi => Ok(abi),
         }
     }
 

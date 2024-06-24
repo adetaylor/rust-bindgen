@@ -1,15 +1,9 @@
-#![allow(
-    dead_code,
-    non_snake_case,
-    non_camel_case_types,
-    non_upper_case_globals
-)]
-
+#![allow(dead_code, non_snake_case, non_camel_case_types, non_upper_case_globals)]
 #[repr(C)]
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
 pub struct Template<T> {
-    pub member: T,
     pub _phantom_0: ::std::marker::PhantomData<::std::cell::UnsafeCell<T>>,
+    pub member: T,
 }
 impl<T> Default for Template<T> {
     fn default() -> Self {
@@ -25,34 +19,17 @@ impl<T> Default for Template<T> {
 pub struct ContainsInstantiation {
     pub not_opaque: Template<::std::os::raw::c_char>,
 }
-#[test]
-fn bindgen_test_layout_ContainsInstantiation() {
-    const UNINIT: ::std::mem::MaybeUninit<ContainsInstantiation> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<ContainsInstantiation>(),
-        1usize,
-        concat!("Size of: ", stringify!(ContainsInstantiation))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<ContainsInstantiation>(),
-        1usize,
-        concat!("Alignment of ", stringify!(ContainsInstantiation))
-    );
-    assert_eq!(
-        unsafe {
-            ::std::ptr::addr_of!((*ptr).not_opaque) as usize - ptr as usize
-        },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(ContainsInstantiation),
-            "::",
-            stringify!(not_opaque)
-        )
-    );
-}
+const _: () = {
+    [
+        "Size of ContainsInstantiation",
+    ][::std::mem::size_of::<ContainsInstantiation>() - 1usize];
+    [
+        "Alignment of ContainsInstantiation",
+    ][::std::mem::align_of::<ContainsInstantiation>() - 1usize];
+    [
+        "Offset of field: ContainsInstantiation::not_opaque",
+    ][::std::mem::offset_of!(ContainsInstantiation, not_opaque) - 0usize];
+};
 impl Default for ContainsInstantiation {
     fn default() -> Self {
         let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
@@ -67,48 +44,22 @@ impl Default for ContainsInstantiation {
 pub struct ContainsOpaqueInstantiation {
     pub opaque: u32,
 }
-#[test]
-fn bindgen_test_layout_ContainsOpaqueInstantiation() {
-    const UNINIT: ::std::mem::MaybeUninit<ContainsOpaqueInstantiation> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<ContainsOpaqueInstantiation>(),
-        4usize,
-        concat!("Size of: ", stringify!(ContainsOpaqueInstantiation))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<ContainsOpaqueInstantiation>(),
-        4usize,
-        concat!("Alignment of ", stringify!(ContainsOpaqueInstantiation))
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).opaque) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(ContainsOpaqueInstantiation),
-            "::",
-            stringify!(opaque)
-        )
-    );
-}
-#[test]
-fn __bindgen_test_layout_Template_open0_char_close0_instantiation() {
-    assert_eq!(
-        ::std::mem::size_of::<Template<::std::os::raw::c_char>>(),
-        1usize,
-        concat!(
-            "Size of template specialization: ",
-            stringify!(Template<::std::os::raw::c_char>)
-        )
-    );
-    assert_eq!(
-        ::std::mem::align_of::<Template<::std::os::raw::c_char>>(),
-        1usize,
-        concat!(
-            "Alignment of template specialization: ",
-            stringify!(Template<::std::os::raw::c_char>)
-        )
-    );
-}
+const _: () = {
+    [
+        "Size of ContainsOpaqueInstantiation",
+    ][::std::mem::size_of::<ContainsOpaqueInstantiation>() - 4usize];
+    [
+        "Alignment of ContainsOpaqueInstantiation",
+    ][::std::mem::align_of::<ContainsOpaqueInstantiation>() - 4usize];
+    [
+        "Offset of field: ContainsOpaqueInstantiation::opaque",
+    ][::std::mem::offset_of!(ContainsOpaqueInstantiation, opaque) - 0usize];
+};
+const _: () = {
+    [
+        "Size of template specialization: Template_open0_char_close0",
+    ][::std::mem::size_of::<Template<::std::os::raw::c_char>>() - 1usize];
+    [
+        "Align of template specialization: Template_open0_char_close0",
+    ][::std::mem::align_of::<Template<::std::os::raw::c_char>>() - 1usize];
+};

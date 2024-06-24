@@ -1,23 +1,22 @@
 Now let's suppose we want to generate bindings for a non-system library. We
 will be the same crate setup as the previous tutorial. First let's create a new
-directory `hello` with two files inside it. A `c` source file `hello.c`
+directory `hello` with two files inside it. A C source file `hello.c`
 containing
 ```c
 int hello() {
     return 42;
 }
 ```
-and a `c` header file `hello.h` containing
+and a C header file `hello.h` containing
 ```c
 int hello();
 ```
-given that the library has not been compiled yet, we need to modify the
+
+Given that the library has not been compiled yet, we need to modify the
 `build.rs` build script to compile the `hello.c` source file into a static
-libary:
+library:
 
 ```rust,ignore
-extern crate bindgen;
-
 use std::env;
 use std::path::PathBuf;
 
@@ -46,9 +45,6 @@ fn main() {
     // Tell cargo to tell rustc to link our `hello` library. Cargo will
     // automatically know it must look for a `libhello.a` file.
     println!("cargo:rustc-link-lib=hello");
-
-    // Tell cargo to invalidate the built crate whenever the header changes.
-    println!("cargo:rerun-if-changed={}", headers_path_str);
 
     // Run `clang` to compile the `hello.c` file into a `hello.o` object file.
     // Unwrap if it is not possible to spawn the process.
@@ -90,7 +86,7 @@ fn main() {
         .header(headers_path_str)
         // Tell cargo to invalidate the built crate whenever any of the
         // included header files changed.
-        .parse_callbacks(Box::new(CargoCallbacks))
+        .parse_callbacks(Box::new(CargoCallbacks::new()))
         // Finish the builder and generate the bindings.
         .generate()
         // Unwrap the Result and panic on failure.
@@ -103,4 +99,3 @@ fn main() {
         .expect("Couldn't write bindings!");
 }
 ```
-

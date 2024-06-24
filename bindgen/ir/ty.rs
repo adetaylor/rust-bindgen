@@ -5,7 +5,6 @@ use super::context::{BindgenContext, ItemId, TypeId};
 use super::dot::DotAttributes;
 use super::enum_ty::Enum;
 use super::function::FunctionSig;
-use super::int::IntKind;
 use super::item::{IsOpaque, Item};
 use super::layout::{Layout, Opaque};
 use super::objc::ObjCInterface;
@@ -18,6 +17,8 @@ use crate::ir::function::Visibility;
 use crate::parse::{ParseError, ParseResult};
 use std::borrow::Cow;
 use std::io;
+
+pub use super::int::IntKind;
 
 /// The base representation of a type in bindgen.
 ///
@@ -125,6 +126,10 @@ impl Type {
         matches!(self.kind, TypeKind::Enum(..))
     }
 
+    /// Is this void?
+    pub(crate) fn is_void(&self) -> bool {
+        matches!(self.kind, TypeKind::Void)
+    }
     /// Is this either a builtin or named type?
     pub(crate) fn is_builtin_or_type_param(&self) -> bool {
         matches!(
@@ -206,9 +211,10 @@ impl Type {
         self.layout.or_else(|| {
             match self.kind {
                 TypeKind::Comp(ref ci) => ci.layout(ctx),
-                TypeKind::Array(inner, length) if length == 0 => Some(
-                    Layout::new(0, ctx.resolve_type(inner).layout(ctx)?.align),
-                ),
+                TypeKind::Array(inner, 0) => Some(Layout::new(
+                    0,
+                    ctx.resolve_type(inner).layout(ctx)?.align,
+                )),
                 // FIXME(emilio): This is a hack for anonymous union templates.
                 // Use the actual pointer size!
                 TypeKind::Pointer(..) => Some(Layout::new(
@@ -247,7 +253,7 @@ impl Type {
         Cow::Owned(name)
     }
 
-    /// Get this type's santizied name.
+    /// Get this type's sanitized name.
     pub(crate) fn sanitized_name<'a>(
         &'a self,
         ctx: &BindgenContext,
@@ -495,7 +501,7 @@ fn is_invalid_type_param_invalid_start() {
 }
 
 #[test]
-fn is_invalid_type_param_invalid_remaing() {
+fn is_invalid_type_param_invalid_remaining() {
     let ty = Type::new(Some("foo-".into()), None, TypeKind::TypeParam, false);
     assert!(ty.is_invalid_type_param())
 }
@@ -555,6 +561,8 @@ impl TemplateParameters for TypeKind {
 /// The kind of float this type represents.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub(crate) enum FloatKind {
+    /// A half (`_Float16` or `__fp16`)
+    Float16,
     /// A `float`.
     Float,
     /// A `double`.
@@ -1097,7 +1105,7 @@ impl Type {
                         Item::from_ty_or_ref(inner, location, None, ctx);
                     if inner_id == potential_id {
                         warn!(
-                            "Generating oqaque type instead of self-referential \
+                            "Generating opaque type instead of self-referential \
                             typedef");
                         // This can happen if we bail out of recursive situations
                         // within the clang parsing.

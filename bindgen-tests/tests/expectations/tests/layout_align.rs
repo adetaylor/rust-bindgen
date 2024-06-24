@@ -1,10 +1,4 @@
-#![allow(
-    dead_code,
-    non_snake_case,
-    non_camel_case_types,
-    non_upper_case_globals
-)]
-
+#![allow(dead_code, non_snake_case, non_camel_case_types, non_upper_case_globals)]
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct __BindgenBitfieldUnit<Storage> {
@@ -55,8 +49,7 @@ where
         debug_assert!(bit_width <= 64);
         debug_assert!(bit_offset / 8 < self.storage.as_ref().len());
         debug_assert!(
-            (bit_offset + (bit_width as usize)) / 8 <=
-                self.storage.as_ref().len()
+            (bit_offset + (bit_width as usize)) / 8 <= self.storage.as_ref().len(),
         );
         let mut val = 0;
         for i in 0..(bit_width as usize) {
@@ -76,8 +69,7 @@ where
         debug_assert!(bit_width <= 64);
         debug_assert!(bit_offset / 8 < self.storage.as_ref().len());
         debug_assert!(
-            (bit_offset + (bit_width as usize)) / 8 <=
-                self.storage.as_ref().len()
+            (bit_offset + (bit_width as usize)) / 8 <= self.storage.as_ref().len(),
         );
         for i in 0..(bit_width as usize) {
             let mask = 1 << i;
@@ -135,19 +127,25 @@ pub struct rte_kni_fifo {
     ///< The buffer contains mbuf pointers
     pub buffer: __IncompleteArrayField<*mut ::std::os::raw::c_void>,
 }
-#[test]
-fn bindgen_test_layout_rte_kni_fifo() {
-    assert_eq!(
-        ::std::mem::size_of::<rte_kni_fifo>(),
-        16usize,
-        concat!("Size of: ", stringify!(rte_kni_fifo))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<rte_kni_fifo>(),
-        8usize,
-        concat!("Alignment of ", stringify!(rte_kni_fifo))
-    );
-}
+const _: () = {
+    ["Size of rte_kni_fifo"][::std::mem::size_of::<rte_kni_fifo>() - 16usize];
+    ["Alignment of rte_kni_fifo"][::std::mem::align_of::<rte_kni_fifo>() - 8usize];
+    [
+        "Offset of field: rte_kni_fifo::write",
+    ][::std::mem::offset_of!(rte_kni_fifo, write) - 0usize];
+    [
+        "Offset of field: rte_kni_fifo::read",
+    ][::std::mem::offset_of!(rte_kni_fifo, read) - 4usize];
+    [
+        "Offset of field: rte_kni_fifo::len",
+    ][::std::mem::offset_of!(rte_kni_fifo, len) - 8usize];
+    [
+        "Offset of field: rte_kni_fifo::elem_size",
+    ][::std::mem::offset_of!(rte_kni_fifo, elem_size) - 12usize];
+    [
+        "Offset of field: rte_kni_fifo::buffer",
+    ][::std::mem::offset_of!(rte_kni_fifo, buffer) - 16usize];
+};
 impl Default for rte_kni_fifo {
     fn default() -> Self {
         let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
@@ -167,40 +165,17 @@ pub struct rte_eth_link {
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 1usize]>,
     pub __bindgen_padding_0: [u8; 3usize],
 }
-#[test]
-fn bindgen_test_layout_rte_eth_link() {
-    const UNINIT: ::std::mem::MaybeUninit<rte_eth_link> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<rte_eth_link>(),
-        8usize,
-        concat!("Size of: ", stringify!(rte_eth_link))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<rte_eth_link>(),
-        8usize,
-        concat!("Alignment of ", stringify!(rte_eth_link))
-    );
-    assert_eq!(
-        unsafe {
-            ::std::ptr::addr_of!((*ptr).link_speed) as usize - ptr as usize
-        },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(rte_eth_link),
-            "::",
-            stringify!(link_speed)
-        )
-    );
-}
+const _: () = {
+    ["Size of rte_eth_link"][::std::mem::size_of::<rte_eth_link>() - 8usize];
+    ["Alignment of rte_eth_link"][::std::mem::align_of::<rte_eth_link>() - 8usize];
+    [
+        "Offset of field: rte_eth_link::link_speed",
+    ][::std::mem::offset_of!(rte_eth_link, link_speed) - 0usize];
+};
 impl rte_eth_link {
     #[inline]
     pub fn link_duplex(&self) -> u16 {
-        unsafe {
-            ::std::mem::transmute(self._bitfield_1.get(0usize, 1u8) as u16)
-        }
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(0usize, 1u8) as u16) }
     }
     #[inline]
     pub fn set_link_duplex(&mut self, val: u16) {
@@ -211,9 +186,7 @@ impl rte_eth_link {
     }
     #[inline]
     pub fn link_autoneg(&self) -> u16 {
-        unsafe {
-            ::std::mem::transmute(self._bitfield_1.get(1usize, 1u8) as u16)
-        }
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(1usize, 1u8) as u16) }
     }
     #[inline]
     pub fn set_link_autoneg(&mut self, val: u16) {
@@ -224,9 +197,7 @@ impl rte_eth_link {
     }
     #[inline]
     pub fn link_status(&self) -> u16 {
-        unsafe {
-            ::std::mem::transmute(self._bitfield_1.get(2usize, 1u8) as u16)
-        }
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(2usize, 1u8) as u16) }
     }
     #[inline]
     pub fn set_link_status(&mut self, val: u16) {
@@ -241,23 +212,36 @@ impl rte_eth_link {
         link_autoneg: u16,
         link_status: u16,
     ) -> __BindgenBitfieldUnit<[u8; 1usize]> {
-        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 1usize]> =
-            Default::default();
-        __bindgen_bitfield_unit.set(0usize, 1u8, {
-            let link_duplex: u16 =
-                unsafe { ::std::mem::transmute(link_duplex) };
-            link_duplex as u64
-        });
-        __bindgen_bitfield_unit.set(1usize, 1u8, {
-            let link_autoneg: u16 =
-                unsafe { ::std::mem::transmute(link_autoneg) };
-            link_autoneg as u64
-        });
-        __bindgen_bitfield_unit.set(2usize, 1u8, {
-            let link_status: u16 =
-                unsafe { ::std::mem::transmute(link_status) };
-            link_status as u64
-        });
+        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 1usize]> = Default::default();
+        __bindgen_bitfield_unit
+            .set(
+                0usize,
+                1u8,
+                {
+                    let link_duplex: u16 = unsafe { ::std::mem::transmute(link_duplex) };
+                    link_duplex as u64
+                },
+            );
+        __bindgen_bitfield_unit
+            .set(
+                1usize,
+                1u8,
+                {
+                    let link_autoneg: u16 = unsafe {
+                        ::std::mem::transmute(link_autoneg)
+                    };
+                    link_autoneg as u64
+                },
+            );
+        __bindgen_bitfield_unit
+            .set(
+                2usize,
+                1u8,
+                {
+                    let link_status: u16 = unsafe { ::std::mem::transmute(link_status) };
+                    link_status as u64
+                },
+            );
         __bindgen_bitfield_unit
     }
 }

@@ -1,10 +1,4 @@
-#![allow(
-    dead_code,
-    non_snake_case,
-    non_camel_case_types,
-    non_upper_case_globals
-)]
-
+#![allow(dead_code, non_snake_case, non_camel_case_types, non_upper_case_globals)]
 #[allow(non_snake_case, non_camel_case_types, non_upper_case_globals)]
 pub mod root {
     #[allow(unused_imports)]
@@ -31,43 +25,20 @@ pub mod root {
         pub struct A {
             pub b: root::whatever::whatever_int_t,
         }
-        #[test]
-        fn bindgen_test_layout_A() {
-            const UNINIT: ::std::mem::MaybeUninit<A> =
-                ::std::mem::MaybeUninit::uninit();
-            let ptr = UNINIT.as_ptr();
-            assert_eq!(
-                ::std::mem::size_of::<A>(),
-                4usize,
-                concat!("Size of: ", stringify!(A))
-            );
-            assert_eq!(
-                ::std::mem::align_of::<A>(),
-                4usize,
-                concat!("Alignment of ", stringify!(A))
-            );
-            assert_eq!(
-                unsafe {
-                    ::std::ptr::addr_of!((*ptr).b) as usize - ptr as usize
-                },
-                0usize,
-                concat!(
-                    "Offset of field: ",
-                    stringify!(A),
-                    "::",
-                    stringify!(b)
-                )
-            );
-        }
+        const _: () = {
+            ["Size of A"][::std::mem::size_of::<A>() - 4usize];
+            ["Alignment of A"][::std::mem::align_of::<A>() - 4usize];
+            ["Offset of field: A::b"][::std::mem::offset_of!(A, b) - 0usize];
+        };
     }
     #[repr(C)]
     #[derive(Debug)]
     pub struct C<T> {
+        pub _phantom_0: ::std::marker::PhantomData<::std::cell::UnsafeCell<T>>,
         pub _base: root::_bindgen_mod_id_17::A,
         pub m_c: T,
         pub m_c_ptr: *mut T,
         pub m_c_arr: [T; 10usize],
-        pub _phantom_0: ::std::marker::PhantomData<::std::cell::UnsafeCell<T>>,
     }
     impl<T> Default for C<T> {
         fn default() -> Self {
@@ -85,9 +56,8 @@ pub mod root {
         #[repr(C)]
         #[derive(Debug)]
         pub struct D<T> {
+            pub _phantom_0: ::std::marker::PhantomData<::std::cell::UnsafeCell<T>>,
             pub m_c: root::C<T>,
-            pub _phantom_0:
-                ::std::marker::PhantomData<::std::cell::UnsafeCell<T>>,
         }
         impl<T> Default for D<T> {
             fn default() -> Self {

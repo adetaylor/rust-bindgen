@@ -1,10 +1,4 @@
-#![allow(
-    dead_code,
-    non_snake_case,
-    non_camel_case_types,
-    non_upper_case_globals
-)]
-
+#![allow(dead_code, non_snake_case, non_camel_case_types, non_upper_case_globals)]
 pub mod foo {
     pub type Type = ::std::os::raw::c_uint;
     pub const THIS: Type = 0;
@@ -31,12 +25,12 @@ pub mod ns2_Foo {
     pub const Variant1: Type = 0;
     pub const Variant2: Type = 1;
 }
-pub use self::anon_enum::Type as anon_enum_alias1;
-pub use self::anon_enum_alias1 as anon_enum_alias2;
-pub use self::anon_enum_alias2 as anon_enum_alias3;
 pub use self::foo::Type as foo_alias1;
 pub use self::foo_alias1 as foo_alias2;
 pub use self::foo_alias2 as foo_alias3;
+pub use self::anon_enum::Type as anon_enum_alias1;
+pub use self::anon_enum_alias1 as anon_enum_alias2;
+pub use self::anon_enum_alias2 as anon_enum_alias3;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct bar {
@@ -51,124 +45,20 @@ pub struct bar {
     pub member9: anon_enum_alias2,
     pub member10: anon_enum_alias3,
 }
-#[test]
-fn bindgen_test_layout_bar() {
-    const UNINIT: ::std::mem::MaybeUninit<bar> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<bar>(),
-        48usize,
-        concat!("Size of: ", stringify!(bar))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<bar>(),
-        8usize,
-        concat!("Alignment of ", stringify!(bar))
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).member1) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(bar),
-            "::",
-            stringify!(member1)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).member2) as usize - ptr as usize },
-        4usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(bar),
-            "::",
-            stringify!(member2)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).member3) as usize - ptr as usize },
-        8usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(bar),
-            "::",
-            stringify!(member3)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).member4) as usize - ptr as usize },
-        12usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(bar),
-            "::",
-            stringify!(member4)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).member5) as usize - ptr as usize },
-        16usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(bar),
-            "::",
-            stringify!(member5)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).member6) as usize - ptr as usize },
-        24usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(bar),
-            "::",
-            stringify!(member6)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).member7) as usize - ptr as usize },
-        32usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(bar),
-            "::",
-            stringify!(member7)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).member8) as usize - ptr as usize },
-        36usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(bar),
-            "::",
-            stringify!(member8)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).member9) as usize - ptr as usize },
-        40usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(bar),
-            "::",
-            stringify!(member9)
-        )
-    );
-    assert_eq!(
-        unsafe {
-            ::std::ptr::addr_of!((*ptr).member10) as usize - ptr as usize
-        },
-        44usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(bar),
-            "::",
-            stringify!(member10)
-        )
-    );
-}
+const _: () = {
+    ["Size of bar"][::std::mem::size_of::<bar>() - 48usize];
+    ["Alignment of bar"][::std::mem::align_of::<bar>() - 8usize];
+    ["Offset of field: bar::member1"][::std::mem::offset_of!(bar, member1) - 0usize];
+    ["Offset of field: bar::member2"][::std::mem::offset_of!(bar, member2) - 4usize];
+    ["Offset of field: bar::member3"][::std::mem::offset_of!(bar, member3) - 8usize];
+    ["Offset of field: bar::member4"][::std::mem::offset_of!(bar, member4) - 12usize];
+    ["Offset of field: bar::member5"][::std::mem::offset_of!(bar, member5) - 16usize];
+    ["Offset of field: bar::member6"][::std::mem::offset_of!(bar, member6) - 24usize];
+    ["Offset of field: bar::member7"][::std::mem::offset_of!(bar, member7) - 32usize];
+    ["Offset of field: bar::member8"][::std::mem::offset_of!(bar, member8) - 36usize];
+    ["Offset of field: bar::member9"][::std::mem::offset_of!(bar, member9) - 40usize];
+    ["Offset of field: bar::member10"][::std::mem::offset_of!(bar, member10) - 44usize];
+};
 impl Default for bar {
     fn default() -> Self {
         let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
@@ -183,32 +73,11 @@ impl Default for bar {
 pub struct Baz {
     pub member1: ns2_Foo::Type,
 }
-#[test]
-fn bindgen_test_layout_Baz() {
-    const UNINIT: ::std::mem::MaybeUninit<Baz> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<Baz>(),
-        4usize,
-        concat!("Size of: ", stringify!(Baz))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<Baz>(),
-        4usize,
-        concat!("Alignment of ", stringify!(Baz))
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).member1) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(Baz),
-            "::",
-            stringify!(member1)
-        )
-    );
-}
+const _: () = {
+    ["Size of Baz"][::std::mem::size_of::<Baz>() - 4usize];
+    ["Alignment of Baz"][::std::mem::align_of::<Baz>() - 4usize];
+    ["Offset of field: Baz::member1"][::std::mem::offset_of!(Baz, member1) - 0usize];
+};
 impl Default for Baz {
     fn default() -> Self {
         let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
@@ -228,27 +97,11 @@ pub mod one_Foo {
 pub struct Bar {
     pub baz: *mut one_Foo::Type,
 }
-#[test]
-fn bindgen_test_layout_Bar() {
-    const UNINIT: ::std::mem::MaybeUninit<Bar> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<Bar>(),
-        8usize,
-        concat!("Size of: ", stringify!(Bar))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<Bar>(),
-        8usize,
-        concat!("Alignment of ", stringify!(Bar))
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).baz) as usize - ptr as usize },
-        0usize,
-        concat!("Offset of field: ", stringify!(Bar), "::", stringify!(baz))
-    );
-}
+const _: () = {
+    ["Size of Bar"][::std::mem::size_of::<Bar>() - 8usize];
+    ["Alignment of Bar"][::std::mem::align_of::<Bar>() - 8usize];
+    ["Offset of field: Bar::baz"][::std::mem::offset_of!(Bar, baz) - 0usize];
+};
 impl Default for Bar {
     fn default() -> Self {
         let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
@@ -277,8 +130,8 @@ extern "C" {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct Thing<T> {
-    pub thing: T,
     pub _phantom_0: ::std::marker::PhantomData<::std::cell::UnsafeCell<T>>,
+    pub thing: T,
 }
 impl<T> Default for Thing<T> {
     fn default() -> Self {

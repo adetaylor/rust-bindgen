@@ -1,10 +1,3 @@
-#![allow(
-    dead_code,
-    non_snake_case,
-    non_camel_case_types,
-    non_upper_case_globals
-)]
-
 #[bindgen_original_name("whatever_t")]
 pub type whatever_whatever_t = ::std::os::raw::c_int;
 extern "C" {

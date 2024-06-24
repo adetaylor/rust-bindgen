@@ -125,20 +125,15 @@ pub(crate) trait MonotoneFramework: Sized + fmt::Debug {
 
 /// Whether an analysis's `constrain` function modified the incremental results
 /// or not.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 pub(crate) enum ConstrainResult {
     /// The incremental results were updated, and the fix-point computation
     /// should continue.
     Changed,
 
     /// The incremental results were not updated.
+    #[default]
     Same,
-}
-
-impl Default for ConstrainResult {
-    fn default() -> Self {
-        ConstrainResult::Same
-    }
 }
 
 impl ops::BitOr for ConstrainResult {
@@ -216,7 +211,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{HashMap, HashSet};
+    use crate::HashSet;
 
     // Here we find the set of nodes that are reachable from any given
     // node. This is a lattice mapping nodes to subsets of all nodes. Our join
@@ -334,20 +329,13 @@ mod tests {
             // Yes, what follows is a **terribly** inefficient set union
             // implementation. Don't copy this code outside of this test!
 
-            let original_size = self
-                .reachable
-                .entry(node)
-                .or_insert_with(HashSet::default)
-                .len();
+            let original_size = self.reachable.entry(node).or_default().len();
 
             for sub_node in self.graph.0[&node].iter() {
                 self.reachable.get_mut(&node).unwrap().insert(*sub_node);
 
-                let sub_reachable = self
-                    .reachable
-                    .entry(*sub_node)
-                    .or_insert_with(HashSet::default)
-                    .clone();
+                let sub_reachable =
+                    self.reachable.entry(*sub_node).or_default().clone();
 
                 for transitive in sub_reachable {
                     self.reachable.get_mut(&node).unwrap().insert(transitive);

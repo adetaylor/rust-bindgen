@@ -1,18 +1,12 @@
-#![allow(
-    dead_code,
-    non_snake_case,
-    non_camel_case_types,
-    non_upper_case_globals
-)]
-
+#![allow(dead_code, non_snake_case, non_camel_case_types, non_upper_case_globals)]
 #[repr(C)]
 #[derive(Debug)]
 #[bindgen_original_name("basic_string")]
 pub struct std_basic_string<CharT> {
+    pub _phantom_0: ::std::marker::PhantomData<::std::cell::UnsafeCell<CharT>>,
     pub hider: std_basic_string_Alloc_hider,
     pub length: ::std::os::raw::c_ulong,
     pub __bindgen_anon_1: std_basic_string__bindgen_ty_1<CharT>,
-    pub _phantom_0: ::std::marker::PhantomData<::std::cell::UnsafeCell<CharT>>,
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -32,8 +26,8 @@ impl Default for std_basic_string_Alloc_hider {
 #[repr(C)]
 #[derive(Debug)]
 pub struct std_basic_string__bindgen_ty_1<CharT> {
-    pub inline_storage: [CharT; 4usize],
     pub _phantom_0: ::std::marker::PhantomData<::std::cell::UnsafeCell<CharT>>,
+    pub inline_storage: [CharT; 4usize],
 }
 impl<CharT> Default for std_basic_string__bindgen_ty_1<CharT> {
     fn default() -> Self {

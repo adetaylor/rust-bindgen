@@ -1,10 +1,4 @@
-#![allow(
-    dead_code,
-    non_snake_case,
-    non_camel_case_types,
-    non_upper_case_globals
-)]
-
+#![allow(dead_code, non_snake_case, non_camel_case_types, non_upper_case_globals)]
 #[allow(non_snake_case, non_camel_case_types, non_upper_case_globals)]
 pub mod root {
     #[allow(unused_imports)]
@@ -17,19 +11,10 @@ pub mod root {
         pub struct Value {
             pub _address: u8,
         }
-        #[test]
-        fn bindgen_test_layout_Value() {
-            assert_eq!(
-                ::std::mem::size_of::<Value>(),
-                1usize,
-                concat!("Size of: ", stringify!(Value))
-            );
-            assert_eq!(
-                ::std::mem::align_of::<Value>(),
-                1usize,
-                concat!("Alignment of ", stringify!(Value))
-            );
-        }
+        const _: () = {
+            ["Size of Value"][::std::mem::size_of::<Value>() - 1usize];
+            ["Alignment of Value"][::std::mem::align_of::<Value>() - 1usize];
+        };
         extern "C" {
             #[bindgen_original_name("a")]
             #[link_name = "\u{1}_ZN2JS5Value1aE10JSWhyMagic"]

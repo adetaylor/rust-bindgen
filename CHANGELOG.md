@@ -7,172 +7,372 @@
   - [Removed](#removed)
   - [Fixed](#fixed)
   - [Security](#security)
-- [0.65.1](#0651)
-  - [Fixed](#fixed-1)
-- [0.65.0](#0650)
+- [0.69.4 (2024-02-04)](#0694-2024-02-04)
   - [Added](#added-1)
   - [Changed](#changed-1)
   - [Removed](#removed-1)
-- [0.64.0](#0640)
+  - [Fixed](#fixed-1)
+  - [Security](#security-1)
+- [0.69.3 (2024-02-04)](#0693-2024-02-04)
   - [Added](#added-2)
   - [Changed](#changed-2)
-- [0.63.0](#0630)
+  - [Removed](#removed-2)
+  - [Fixed](#fixed-2)
+  - [Security](#security-2)
+- [0.69.2 (2024-01-13)](#0692-2024-01-13)
   - [Added](#added-3)
   - [Changed](#changed-3)
-  - [Removed](#removed-2)
-- [0.62.0](#0620)
+  - [Removed](#removed-3)
+  - [Fixed](#fixed-3)
+  - [Security](#security-3)
+- [0.69.1 (2023-11-02)](#0691-2023-11-02)
+  - [Fixed](#fixed-4)
+- [0.69.0 (2023-11-01)](#0690-2023-11-01)
   - [Added](#added-4)
   - [Changed](#changed-4)
-  - [Fixed](#fixed-2)
-- [0.61.0](#0610)
+  - [Removed](#removed-4)
+  - [Fixed](#fixed-5)
+  - [Security](#security-4)
+- [0.68.1](#0681)
+  - [Fixed](#fixed-6)
+- [0.68.0](#0680)
   - [Added](#added-5)
   - [Changed](#changed-5)
-  - [Fixed](#fixed-3)
-- [0.60.1](#0601)
-  - [Fixed](#fixed-4)
-- [0.60.0](#0600)
+  - [Removed](#removed-5)
+  - [Fixed](#fixed-7)
+- [0.67.0](#0670)
+- [0.66.1](#0661)
+  - [Removed](#removed-6)
+- [0.66.0](#0660)
   - [Added](#added-6)
-  - [Fixed](#fixed-5)
   - [Changed](#changed-6)
-  - [Removed](#removed-3)
+  - [Removed](#removed-7)
+- [0.65.1](#0651)
+  - [Fixed](#fixed-8)
+- [0.65.0](#0650)
+  - [Added](#added-7)
+  - [Changed](#changed-7)
+  - [Removed](#removed-8)
+- [0.64.0](#0640)
+  - [Added](#added-8)
+  - [Changed](#changed-8)
+- [0.63.0](#0630)
+  - [Added](#added-9)
+  - [Changed](#changed-9)
+  - [Removed](#removed-9)
+- [0.62.0](#0620)
+  - [Added](#added-10)
+  - [Changed](#changed-10)
+  - [Fixed](#fixed-9)
+- [0.61.0](#0610)
+  - [Added](#added-11)
+  - [Changed](#changed-11)
+  - [Fixed](#fixed-10)
+- [0.60.1](#0601)
+  - [Fixed](#fixed-11)
+- [0.60.0](#0600)
+  - [Added](#added-12)
+  - [Fixed](#fixed-12)
+  - [Changed](#changed-12)
+  - [Removed](#removed-10)
 - [0.59.2](#0592)
 - [0.59.1](#0591)
-  - [Fixed](#fixed-6)
-- [0.59.0](#0590)
-  - [Added](#added-7)
-  - [Fixed](#fixed-7)
-  - [Changed](#changed-7)
-- [0.58.1](#0581)
-  - [Added](#added-8)
-- [0.58.0](#0580)
-  - [Added](#added-9)
-  - [Fixed](#fixed-8)
-  - [Changed](#changed-8)
-  - [Deprecated](#deprecated)
-  - [Removed](#removed-4)
-  - [Fixed](#fixed-9)
-  - [Security](#security-1)
-- [0.57.0](#0570)
-  - [Added](#added-10)
-  - [Fixed](#fixed-10)
-- [0.56.0](#0560)
-  - [Added](#added-11)
-  - [Changed](#changed-9)
-  - [Fixed](#fixed-11)
-- [0.55.1](#0551)
-  - [Fixed](#fixed-12)
-- [0.55.0](#0550)
-  - [Removed](#removed-5)
-  - [Added](#added-12)
-  - [Changed](#changed-10)
   - [Fixed](#fixed-13)
-- [0.54.1](#0541)
+- [0.59.0](#0590)
   - [Added](#added-13)
-  - [Changed](#changed-11)
   - [Fixed](#fixed-14)
-- [0.54.0](#0540)
-  - [Added](#added-14)
-  - [Changed](#changed-12)
-  - [Fixed](#fixed-15)
-- [0.53.3](#0533)
-  - [Added](#added-15)
-  - [Fixed](#fixed-16)
-- [0.53.2](#0532)
   - [Changed](#changed-13)
-- [0.53.1](#0531)
-  - [Added](#added-16)
-- [0.53.0](#0530)
-  - [Added](#added-17)
+- [0.58.1](#0581)
+  - [Added](#added-14)
+- [0.58.0](#0580)
+  - [Added](#added-15)
+  - [Fixed](#fixed-15)
   - [Changed](#changed-14)
+  - [Deprecated](#deprecated)
+  - [Removed](#removed-11)
+  - [Fixed](#fixed-16)
+  - [Security](#security-5)
+- [0.57.0](#0570)
+  - [Added](#added-16)
   - [Fixed](#fixed-17)
-- [0.52.0](#0520)
-  - [Added](#added-18)
+- [0.56.0](#0560)
+  - [Added](#added-17)
   - [Changed](#changed-15)
   - [Fixed](#fixed-18)
-- [0.51.1](#0511)
+- [0.55.1](#0551)
   - [Fixed](#fixed-19)
+- [0.55.0](#0550)
+  - [Removed](#removed-12)
+  - [Added](#added-18)
   - [Changed](#changed-16)
-- [0.51.0](#0510)
   - [Fixed](#fixed-20)
-  - [Changed](#changed-17)
+- [0.54.1](#0541)
   - [Added](#added-19)
-- [0.50.0](#0500)
-  - [Added](#added-20)
-- [0.49.3](#0493)
-  - [Added](#added-21)
-- [0.49.2](#0492)
-  - [Changed](#changed-18)
-- [0.49.1](#0491)
+  - [Changed](#changed-17)
   - [Fixed](#fixed-21)
-  - [Changed](#changed-19)
-- [0.49.0](#0490)
-  - [Added](#added-22)
+- [0.54.0](#0540)
+  - [Added](#added-20)
+  - [Changed](#changed-18)
   - [Fixed](#fixed-22)
-  - [Changed](#changed-20)
-- [0.48.1](#0481)
+- [0.53.3](#0533)
+  - [Added](#added-21)
   - [Fixed](#fixed-23)
-- [0.48.0](#0480)
-  - [Changed](#changed-21)
-  - [Fixed](#fixed-24)
-- [0.47.4](#0474)
+- [0.53.2](#0532)
+  - [Changed](#changed-19)
+- [0.53.1](#0531)
+  - [Added](#added-22)
+- [0.53.0](#0530)
   - [Added](#added-23)
-- [0.47.3](#0473)
-  - [Changed](#changed-22)
-- [0.47.2](#0472)
-  - [Fixed](#fixed-25)
-- [0.47.1](#0471)
-  - [Changed](#changed-23)
-  - [Fixed](#fixed-26)
-- [0.47.0](#0470)
-  - [Changed](#changed-24)
-  - [Fixed](#fixed-27)
-- [0.33.1 .. 0.46.0](#0331--0460)
+  - [Changed](#changed-20)
+  - [Fixed](#fixed-24)
+- [0.52.0](#0520)
   - [Added](#added-24)
-  - [Removed](#removed-6)
-  - [Changed](#changed-25)
+  - [Changed](#changed-21)
+  - [Fixed](#fixed-25)
+- [0.51.1](#0511)
+  - [Fixed](#fixed-26)
+  - [Changed](#changed-22)
+- [0.51.0](#0510)
+  - [Fixed](#fixed-27)
+  - [Changed](#changed-23)
+  - [Added](#added-25)
+- [0.50.0](#0500)
+  - [Added](#added-26)
+- [0.49.3](#0493)
+  - [Added](#added-27)
+- [0.49.2](#0492)
+  - [Changed](#changed-24)
+- [0.49.1](#0491)
   - [Fixed](#fixed-28)
-- [0.33.1](#0331)
+  - [Changed](#changed-25)
+- [0.49.0](#0490)
+  - [Added](#added-28)
   - [Fixed](#fixed-29)
+  - [Changed](#changed-26)
+- [0.48.1](#0481)
+  - [Fixed](#fixed-30)
+- [0.48.0](#0480)
+  - [Changed](#changed-27)
+  - [Fixed](#fixed-31)
+- [0.47.4](#0474)
+  - [Added](#added-29)
+- [0.47.3](#0473)
+  - [Changed](#changed-28)
+- [0.47.2](#0472)
+  - [Fixed](#fixed-32)
+- [0.47.1](#0471)
+  - [Changed](#changed-29)
+  - [Fixed](#fixed-33)
+- [0.47.0](#0470)
+  - [Changed](#changed-30)
+  - [Fixed](#fixed-34)
+- [0.33.1 .. 0.46.0](#0331--0460)
+  - [Added](#added-30)
+  - [Removed](#removed-13)
+  - [Changed](#changed-31)
+  - [Fixed](#fixed-35)
+- [0.33.1](#0331)
+  - [Fixed](#fixed-36)
 - [0.33.0](#0330)
 - [0.32.2](#0322)
-  - [Fixed](#fixed-30)
+  - [Fixed](#fixed-37)
 - [0.32.1](#0321)
-  - [Fixed](#fixed-31)
+  - [Fixed](#fixed-38)
 - [0.32.0](#0320)
-  - [Added](#added-25)
-  - [Changed](#changed-26)
-  - [Fixed](#fixed-32)
+  - [Added](#added-31)
+  - [Changed](#changed-32)
+  - [Fixed](#fixed-39)
 - [0.31.0](#0310)
-  - [Added](#added-26)
-  - [Changed](#changed-27)
+  - [Added](#added-32)
+  - [Changed](#changed-33)
   - [Deprecated](#deprecated-1)
-  - [Removed](#removed-7)
-  - [Fixed](#fixed-33)
+  - [Removed](#removed-14)
+  - [Fixed](#fixed-40)
 - [0.30.0](#0300)
-  - [Added](#added-27)
-  - [Changed](#changed-28)
+  - [Added](#added-33)
+  - [Changed](#changed-34)
   - [Deprecated](#deprecated-2)
-  - [Fixed](#fixed-34)
+  - [Fixed](#fixed-41)
 - [0.29.0](#0290)
-  - [Added](#added-28)
-  - [Changed](#changed-29)
-  - [Fixed](#fixed-35)
+  - [Added](#added-34)
+  - [Changed](#changed-35)
+  - [Fixed](#fixed-42)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
 --------------------------------------------------------------------------------
-
 # Unreleased
+## Added
+- Add target mappings for riscv64imac and riscv32imafc.
+- Add a complex macro fallback API (#2779).
+- Add option to use DST structs for flexible arrays (--flexarray-dst, #2772).
+- Add option to dynamically load variables (#2812).
+## Changed
+- Remove which and lazy-static dependencies (#2809, #2817).
+- Generate compile-time layout tests (#2787).
+## Removed
+## Fixed
+- Fix `--formatter=prettyplease` not working in `bindgen-cli` by adding `prettyplease` feature and
+  enabling it by default for `bindgen-cli` (#2789) .
+- Fix `--allowlist-item` so anonymous enums are no longer ignored.
+- Use clang_getFileLocation instead of clang_getSpellingLocation to fix clang-trunk (#2824)
+
+## Security
+
+# 0.69.4 (2024-02-04)
+## Added
+## Changed
+- Allow older itertools. (#2745)
+## Removed
+## Fixed
+## Security
+
+# 0.69.3 (2024-02-04)
+## Added
+
+- Added blocklist_var (#2731)
+- Stabilized thiscall_abi (#2661)
+
+## Changed
+
+- Use CR consistently on windows (#2698)
+- Replaced peeking_take_while by itertools (#2724)
+
+## Removed
+## Fixed
+
+- Try to avoid repr(packed) for explicitly aligned types when not needed (#2734)
+- Improved destructor handling on Windows (#2663)
+- Support Float16 (#2667)
+- Fix alignment contribution from bitfields (#2680)
+- Fixed msrv build.
+
+## Security
+
+- Updated shlex dependency (RUSTSEC-2024-0006)
+
+# 0.69.2 (2024-01-13)
+## Added
+## Changed
+## Removed
+## Fixed
+- Fixed generation of extern "C" blocks with llvm 18+. See #2689.
+## Security
+
+# 0.69.1 (2023-11-02)
+
+## Fixed
+- Allow to run `bindgen -v` without an input header argument.
+
+# 0.69.0 (2023-11-01)
+
+## Added
+- Added the `ParseCallbacks::header_file` callback which runs on every filename passed to `Builder::header`.
+- Added the `CargoCallbacks::new` constructor which emits a cargo-rerun line
+  for every input header file by default.
+- Added the `CargoCallbacks::rerun_on_header_files` method to configure whether
+  a cargo-rerun line should be emitted for every input header file.
+## Changed
+- The `--wrap-static-fns` feature was updated so function types that has no
+  argument use `void` as its sole argument.
+- `CargoCallbacks` is no longer a [unit-like
+  struct](https://doc.rust-lang.org/reference/items/structs.html) and the
+  `CargoCallbacks` constant was added to mitigate the breaking nature of this
+  change. This constant has been marked as deprecated and users will have to
+  use the new `CargoCallbacks::new` method in the future.
+## Removed
+## Fixed
+- Allow compiling `bindgen-cli` with a static libclang.
+- Emit an opaque integer type for pointer types that don't have the same size
+  as the target's pointer size.
+- Avoid escaping Objective-C method names unless they are `Self`, `self`,
+  `crate` or `super`.
+## Security
+
+# 0.68.1
+
+## Fixed
+- Fixed errors on the windows artifact build process.
+
+# 0.68.0
+
+## Added
+- The `system` ABI is now supported as an option for the `--override-abi` flag.
+- The `allowlist_item` method and the `--allowlist-item` flag have been
+  included to filter items regardless or their kind.
+- Include installers as release artifacts on Github.
+## Changed
+- The `Clone` implementation for `_BindgenUnionField` has been changed to pass
+  the `incorrect_clone_impl_on_copy_type` Clippy lint.
+- The `c_unwind` ABI can be used without a feature gate for any Rust target version
+  equal to or greater than 1.71.
+  This comes as a result of the ABI being stabilised (in Rust 1.71).
+- Formatting changes when using prettyplease as a formatter due to a new
+  prettyplease version.
+- Avoid generating invalid `CStr` constants when using the `--generate-cstr`
+  option.
+## Removed
+- The `extra_assert` and `extra_assert_eq` macros are no longer exported.
+## Fixed
+- Bindgen no longer panics when parsing an objective-C header that includes a
+  Rust keyword that cannot be a raw identifier, such as: `self`, `crate`,
+  `super` or `Self`.
+
+# 0.67.0
+
+This version was skipped due to some problems on the release workflow.
+
+# 0.66.1
+
+## Removed
+* Revert source order sorting (#2543) due to correctness regressions #2558.
+
+# 0.66.0
 
 ## Added
 
+* Added the `--generate-cstr` CLI flag to generate string constants as `&CStr`
+  instead of `&[u8]`. (Requires Rust 1.59 or higher.)
+* Added the `--generate-shell-completions` CLI flag to generate completions for
+  different shells.
+* The `--wrap-static-fns` option can now wrap `va_list` functions as variadic functions
+  with the experimental `ParseCallbacks::wrap_as_variadic_fn` method.
+* Add target mappings for riscv32imc and riscv32imac.
+* Add the `ParseCallbacks::field_visibility` method to modify field visibility. 
+
 ## Changed
-   
+
+* Non-UTF-8 string constants are now generated as references (`&[u8; SIZE]`)
+  instead of arrays (`[u8; SIZE]`) to match UTF-8 strings.
+* Wrappers for static functions that return `void` no longer contain a `return`
+  statement and only call the static function instead.
+* The `--wrap-static-fns` option no longer emits wrappers for static variadic
+  functions.
+* Depfiles generated with `--depfile` or `Builder::depfile` will now properly
+  generate module names and paths that include spaces by escaping them. To make
+  the escaping clear and consistent, backslashes are also escaped.
+* Updated `bitflags` dependency to 2.2.1. This changes the API of `CodegenConfig`.
+* Prettyplease formatting is gated by an optional, enabled by default Cargo
+  feature when depending on `bindgen` as a library.
+* Items are now parsed in the order they appear in source files. This may result in
+  auto-generated `_bindgen_*` names having a different index.
+* Use default visibility for padding fields: Previously, padding fields were
+  always public. Now, they follow the default visibility for the type they are
+  in.
+* Compute visibility of bitfield unit based on actual field visibility: A
+  bitfield unit field and its related functions now have their visibility
+  determined based on the most private between the default visibility and the
+  actual visibility of the bitfields within the unit. 
+
 ## Removed
+* Remove redundant Cargo features, which were all implicit:
+  - bindgen-cli: `env_logger` and `log` removed in favor of `logging`
+  - bindgen (lib):
+    + `log` removed in favor of `logging`
+    + `which` removed in favor of `which-logging`
+    + `annotate-snippets` removed in favor of `experimental`
 
-## Fixed
-
-## Security
+* Prettyplease is available as a `Formatter` variant now.
 
 # 0.65.1
 
@@ -250,7 +450,7 @@
  * The return type is now ommited in signatures of functions returning `void`.
  * Updated the `clap` dependency for `bindgen-cli` to 4.
  * Rewrote the `bindgen-cli` argument parser which could introduce unexpected
-   behavior changes. 
+   behavior changes.
  * The `ParseCallbacks::add_derives` method now receives `DeriveInfo<'_>` as
    argument instead of a `&str`. This type also includes the kind of target type.
 

@@ -19,7 +19,7 @@ use super::module::{Module, ModuleKind};
 use super::template::{TemplateInstantiation, TemplateParameters};
 use super::traversal::{self, Edge, ItemTraversal};
 use super::ty::{FloatKind, Type, TypeKind};
-use crate::clang::{self, Cursor};
+use crate::clang::{self, ABIKind, Cursor};
 use crate::codegen::CodegenError;
 use crate::BindgenOptions;
 use crate::{Entry, HashMap, HashSet};
@@ -29,14 +29,16 @@ use quote::ToTokens;
 use std::borrow::Cow;
 use std::cell::{Cell, RefCell};
 use std::collections::{BTreeSet, HashMap as StdHashMap};
-use std::iter::IntoIterator;
+use std::fs::OpenOptions;
+use std::io::Write;
 use std::mem;
+use std::path::Path;
 
 /// An identifier for some kind of IR item.
 #[derive(Debug, Copy, Clone, Eq, PartialOrd, Ord, Hash)]
 pub(crate) struct ItemId(usize);
 
-/// Declare a newtype around `ItemId` with convesion methods.
+/// Declare a newtype around `ItemId` with conversion methods.
 macro_rules! item_id_newtype {
     (
         $( #[$attr:meta] )*
@@ -356,8 +358,16 @@ pub(crate) struct BindgenContext {
     /// This needs to be an std::HashMap because the cexpr API requires it.
     parsed_macros: StdHashMap<Vec<u8>, cexpr::expr::EvalResult>,
 
+    /// A map with all include locations.
+    ///
+    /// This is needed so that items are created in the order they are defined in.
+    ///
+    /// The key is the included file, the value is a pair of the source file and
+    /// the position of the `#include` directive in the source file.
+    includes: StdHashMap<String, (String, usize)>,
+
     /// A set of all the included filenames.
-    deps: BTreeSet<String>,
+    deps: BTreeSet<Box<str>>,
 
     /// The active replacements collected from replaces="xxx" annotations.
     replacements: HashMap<Vec<String>, ItemId>,
@@ -369,6 +379,9 @@ pub(crate) struct BindgenContext {
     /// The translation unit for parsing.
     translation_unit: clang::TranslationUnit,
 
+    /// The translation unit for macro fallback parsing.
+    fallback_tu: Option<clang::FallbackTranslationUnit>,
+
     /// Target information that can be useful for some stuff.
     target_info: clang::TargetInfo,
 
@@ -377,6 +390,9 @@ pub(crate) struct BindgenContext {
 
     /// Whether a bindgen complex was generated
     generated_bindgen_complex: Cell<bool>,
+
+    /// Whether a bindgen float16 was generated
+    generated_bindgen_float16: Cell<bool>,
 
     /// The set of `ItemId`s that are allowlisted. This the very first thing
     /// computed after parsing our IR, and before running any of our analyses.
@@ -560,6 +576,7 @@ If you encounter an error missing from this list, please file an issue or a PR!"
 
         BindgenContext {
             items: vec![Some(root_module)],
+            includes: Default::default(),
             deps,
             types: Default::default(),
             type_params: Default::default(),
@@ -573,9 +590,11 @@ If you encounter an error missing from this list, please file an issue or a PR!"
             collected_typerefs: false,
             in_codegen: false,
             translation_unit,
+            fallback_tu: None,
             target_info,
             options,
             generated_bindgen_complex: Cell::new(false),
+            generated_bindgen_float16: Cell::new(false),
             allowlisted: None,
             blocklisted_types_implement_traits: Default::default(),
             codegen_items: None,
@@ -613,6 +632,11 @@ If you encounter an error missing from this list, please file an issue or a PR!"
         self.target_info.pointer_width / 8
     }
 
+    /// Returns the ABI, which is mostly useful for determining the mangling kind.
+    pub(crate) fn abi_kind(&self) -> ABIKind {
+        self.target_info.abi
+    }
+
     /// Get the stack of partially parsed types that we are in the middle of
     /// parsing.
     pub(crate) fn currently_parsed_types(&self) -> &[PartialType] {
@@ -634,16 +658,33 @@ If you encounter an error missing from this list, please file an issue or a PR!"
         )
     }
 
-    /// Add another path to the set of included files.
-    pub(crate) fn include_file(&mut self, filename: String) {
-        for cb in &self.options().parse_callbacks {
-            cb.include_file(&filename);
-        }
-        self.deps.insert(filename);
+    /// Add the location of the `#include` directive for the `included_file`.
+    pub(crate) fn add_include(
+        &mut self,
+        source_file: String,
+        included_file: String,
+        offset: usize,
+    ) {
+        self.includes
+            .entry(included_file)
+            .or_insert((source_file, offset));
+    }
+
+    /// Get the location of the first `#include` directive for the `included_file`.
+    pub(crate) fn included_file_location(
+        &self,
+        included_file: &str,
+    ) -> Option<(String, usize)> {
+        self.includes.get(included_file).cloned()
+    }
+
+    /// Add an included file.
+    pub(crate) fn add_dep(&mut self, dep: Box<str>) {
+        self.deps.insert(dep);
     }
 
     /// Get any included files.
-    pub(crate) fn deps(&self) -> &BTreeSet<String> {
+    pub(crate) fn deps(&self) -> &BTreeSet<Box<str>> {
         &self.deps
     }
 
@@ -1193,11 +1234,11 @@ If you encounter an error missing from this list, please file an issue or a PR!"
         Ok((ret, self.options))
     }
 
-    /// When the `testing_only_extra_assertions` feature is enabled, this
+    /// When the `__testing_only_extra_assertions` feature is enabled, this
     /// function walks the IR graph and asserts that we do not have any edges
     /// referencing an ItemId for which we do not have an associated IR item.
     fn assert_no_dangling_references(&self) {
-        if cfg!(feature = "testing_only_extra_assertions") {
+        if cfg!(feature = "__testing_only_extra_assertions") {
             for _ in self.assert_no_dangling_item_traversal() {
                 // The iterator's next method does the asserting for us.
             }
@@ -1218,11 +1259,11 @@ If you encounter an error missing from this list, please file an issue or a PR!"
         )
     }
 
-    /// When the `testing_only_extra_assertions` feature is enabled, walk over
+    /// When the `__testing_only_extra_assertions` feature is enabled, walk over
     /// every item and ensure that it is in the children set of one of its
     /// module ancestors.
     fn assert_every_item_in_a_module(&self) {
-        if cfg!(feature = "testing_only_extra_assertions") {
+        if cfg!(feature = "__testing_only_extra_assertions") {
             assert!(self.in_codegen_phase());
             assert!(self.current_module == self.root_module);
 
@@ -1982,6 +2023,7 @@ If you encounter an error missing from this list, please file an issue or a PR!"
             CXType_ULongLong => TypeKind::Int(IntKind::ULongLong),
             CXType_Int128 => TypeKind::Int(IntKind::I128),
             CXType_UInt128 => TypeKind::Int(IntKind::U128),
+            CXType_Float16 | CXType_Half => TypeKind::Float(FloatKind::Float16),
             CXType_Float => TypeKind::Float(FloatKind::Float),
             CXType_Double => TypeKind::Float(FloatKind::Double),
             CXType_LongDouble => TypeKind::Float(FloatKind::LongDouble),
@@ -1990,6 +2032,7 @@ If you encounter an error missing from this list, please file an issue or a PR!"
                 let float_type =
                     ty.elem_type().expect("Not able to resolve complex type?");
                 let float_kind = match float_type.kind() {
+                    CXType_Float16 | CXType_Half => FloatKind::Float16,
                     CXType_Float => FloatKind::Float,
                     CXType_Double => FloatKind::Double,
                     CXType_LongDouble => FloatKind::LongDouble,
@@ -2025,6 +2068,113 @@ If you encounter an error missing from this list, please file an issue or a PR!"
     /// Get the current Clang translation unit that is being processed.
     pub(crate) fn translation_unit(&self) -> &clang::TranslationUnit {
         &self.translation_unit
+    }
+
+    /// Initialize fallback translation unit if it does not exist and
+    /// then return a mutable reference to the fallback translation unit.
+    pub(crate) fn try_ensure_fallback_translation_unit(
+        &mut self,
+    ) -> Option<&mut clang::FallbackTranslationUnit> {
+        if self.fallback_tu.is_none() {
+            let file = format!(
+                "{}/.macro_eval.c",
+                match self.options().clang_macro_fallback_build_dir {
+                    Some(ref path) => path.as_os_str().to_str()?,
+                    None => ".",
+                }
+            );
+
+            let index = clang::Index::new(false, false);
+
+            let mut header_names_to_compile = Vec::new();
+            let mut header_paths = Vec::new();
+            let mut header_contents = String::new();
+            for input_header in self.options.input_headers.iter() {
+                let path = Path::new(input_header.as_ref());
+                if let Some(header_path) = path.parent() {
+                    if header_path == Path::new("") {
+                        header_paths.push(".");
+                    } else {
+                        header_paths.push(header_path.as_os_str().to_str()?);
+                    }
+                } else {
+                    header_paths.push(".");
+                }
+                let header_name = path.file_name()?.to_str()?;
+                header_names_to_compile
+                    .push(header_name.split(".h").next()?.to_string());
+                header_contents +=
+                    format!("\n#include <{header_name}>").as_str();
+            }
+            let header_to_precompile = format!(
+                "{}/{}",
+                match self.options().clang_macro_fallback_build_dir {
+                    Some(ref path) => path.as_os_str().to_str()?,
+                    None => ".",
+                },
+                header_names_to_compile.join("-") + "-precompile.h"
+            );
+            let pch = header_to_precompile.clone() + ".pch";
+
+            let mut header_to_precompile_file = OpenOptions::new()
+                .create(true)
+                .truncate(true)
+                .write(true)
+                .open(&header_to_precompile)
+                .ok()?;
+            header_to_precompile_file
+                .write_all(header_contents.as_bytes())
+                .ok()?;
+
+            let mut c_args = Vec::new();
+            c_args.push("-x".to_string().into_boxed_str());
+            c_args.push("c-header".to_string().into_boxed_str());
+            for header_path in header_paths {
+                c_args.push(format!("-I{header_path}").into_boxed_str());
+            }
+            c_args.extend(
+                self.options
+                    .clang_args
+                    .iter()
+                    .filter(|next| {
+                        !self.options.input_headers.contains(next) &&
+                            next.as_ref() != "-include"
+                    })
+                    .cloned(),
+            );
+            let mut tu = clang::TranslationUnit::parse(
+                &index,
+                &header_to_precompile,
+                &c_args,
+                &[],
+                clang_sys::CXTranslationUnit_ForSerialization,
+            )?;
+            tu.save(&pch).ok()?;
+
+            let mut c_args = vec![
+                "-include-pch".to_string().into_boxed_str(),
+                pch.clone().into_boxed_str(),
+            ];
+            c_args.extend(
+                self.options
+                    .clang_args
+                    .clone()
+                    .iter()
+                    .filter(|next| {
+                        !self.options.input_headers.contains(next) &&
+                            next.as_ref() != "-include"
+                    })
+                    .cloned(),
+            );
+            self.fallback_tu = Some(clang::FallbackTranslationUnit::new(
+                file,
+                header_to_precompile,
+                pch,
+                &c_args,
+            )?);
+        }
+
+        self.fallback_tu.as_mut()
     }
 
     /// Have we parsed the macro named `macro_name` already?
@@ -2320,7 +2470,8 @@ If you encounter an error missing from this list, please file an issue or a PR!"
                     if self.options().allowlisted_types.is_empty() &&
                         self.options().allowlisted_functions.is_empty() &&
                         self.options().allowlisted_vars.is_empty() &&
-                        self.options().allowlisted_files.is_empty()
+                        self.options().allowlisted_files.is_empty() &&
+                        self.options().allowlisted_items.is_empty()
                     {
                         return true;
                     }
@@ -2350,6 +2501,11 @@ If you encounter an error missing from this list, please file an issue or a PR!"
 
                     let name = item.path_for_allowlisting(self)[1..].join("::");
                     debug!("allowlisted_items: testing {:?}", name);
+
+                    if self.options().allowlisted_items.matches(&name) {
+                        return true;
+                    }
+
                     match *item.kind() {
                         ItemKind::Module(..) => true,
                         ItemKind::Function(_) => {
@@ -2415,7 +2571,11 @@ If you encounter an error missing from this list, please file an issue or a PR!"
                                 );
                                 let name = prefix_path[1..].join("::");
                                 prefix_path.pop().unwrap();
-                                self.options().allowlisted_vars.matches(name)
+                                self.options().allowlisted_vars.matches(&name)
+                                    || self
+                                        .options()
+                                        .allowlisted_items
+                                        .matches(name)
                             })
                         }
                     }
@@ -2473,6 +2633,10 @@ If you encounter an error missing from this list, please file an issue or a PR!"
         for item in self.options().allowlisted_types.unmatched_items() {
             unused_regex_diagnostic(item, "--allowlist-type", self);
         }
+
+        for item in self.options().allowlisted_items.unmatched_items() {
+            unused_regex_diagnostic(item, "--allowlist-items", self);
+        }
     }
 
     /// Convenient method for getting the prefix to use for most traits in
@@ -2493,6 +2657,16 @@ If you encounter an error missing from this list, please file an issue or a PR!"
     /// Whether we need to generate the bindgen complex type
     pub(crate) fn need_bindgen_complex_type(&self) -> bool {
         self.generated_bindgen_complex.get()
+    }
+
+    /// Call if a bindgen float16 is generated
+    pub(crate) fn generated_bindgen_float16(&self) {
+        self.generated_bindgen_float16.set(true)
+    }
+
+    /// Whether we need to generate the bindgen float16 type
+    pub(crate) fn need_bindgen_float16_type(&self) -> bool {
+        self.generated_bindgen_float16.get()
     }
 
     /// Compute which `enum`s have an associated `typedef` definition.

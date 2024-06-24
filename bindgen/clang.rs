@@ -6,11 +6,15 @@
 
 use crate::ir::context::BindgenContext;
 use clang_sys::*;
+use std::cmp;
+
 use std::ffi::{CStr, CString};
 use std::fmt;
+use std::fs::OpenOptions;
 use std::hash::Hash;
 use std::hash::Hasher;
 use std::os::raw::{c_char, c_int, c_longlong, c_uint, c_ulong, c_ulonglong};
+use std::sync::OnceLock;
 use std::{mem, ptr, slice};
 
 /// Type representing a clang attribute.
@@ -496,6 +500,96 @@ impl Cursor {
         }
     }
 
+    /// Traverse all of this cursor's children, sorted by where they appear in source code.
+    ///
+    /// Call the given function on each AST node traversed.
+    pub(crate) fn visit_sorted<Visitor>(
+        &self,
+        ctx: &mut BindgenContext,
+        mut visitor: Visitor,
+    ) where
+        Visitor: FnMut(&mut BindgenContext, Cursor),
+    {
+        // FIXME(#2556): The current source order stuff doesn't account well for different levels
+        // of includes, or includes that show up at the same byte offset because they are passed in
+        // via CLI.
+        const SOURCE_ORDER_ENABLED: bool = false;
+        if !SOURCE_ORDER_ENABLED {
+            return self.visit(|c| {
+                visitor(ctx, c);
+                CXChildVisit_Continue
+            });
+        }
+
+        let mut children = self.collect_children();
+        for child in &children {
+            if child.kind() == CXCursor_InclusionDirective {
+                if let Some(included_file) = child.get_included_file_name() {
+                    let location = child.location();
+                    let (source_file, _, _, offset) = location.location();
+
+                    if let Some(source_file) = source_file.name() {
+                        ctx.add_include(source_file, included_file, offset);
+                    }
+                }
+            }
+        }
+        children
+            .sort_by(|child1, child2| child1.cmp_by_source_order(child2, ctx));
+        for child in children {
+            visitor(ctx, child);
+        }
+    }
+
+    /// Compare source order of two cursors, considering `#include` directives.
+    ///
+    /// Built-in items provided by the compiler (which don't have a source file),
+    /// are sorted first. Remaining files are sorted by their position in the source file.
+    /// If the items' source files differ, they are sorted by the position of the first
+    /// `#include` for their source file. If no source files are included, `None` is returned.
+    fn cmp_by_source_order(
+        &self,
+        other: &Self,
+        ctx: &BindgenContext,
+    ) -> cmp::Ordering {
+        let (file, _, _, offset) = self.location().location();
+        let (other_file, _, _, other_offset) = other.location().location();
+
+        let (file, other_file) = match (file.name(), other_file.name()) {
+            (Some(file), Some(other_file)) => (file, other_file),
+            // Built-in definitions should come first.
+            (Some(_), None) => return cmp::Ordering::Greater,
+            (None, Some(_)) => return cmp::Ordering::Less,
+            (None, None) => return cmp::Ordering::Equal,
+        };
+
+        if file == other_file {
+            // Both items are in the same source file, compare by byte offset.
+            return offset.cmp(&other_offset);
+        }
+
+        let include_location = ctx.included_file_location(&file);
+        let other_include_location = ctx.included_file_location(&other_file);
+        match (include_location, other_include_location) {
+            (Some((file2, offset2)), _) if file2 == other_file => {
+                offset2.cmp(&other_offset)
+            }
+            (Some(_), None) => cmp::Ordering::Greater,
+            (_, Some((other_file2, other_offset2))) if file == other_file2 => {
+                offset.cmp(&other_offset2)
+            }
+            (None, Some(_)) => cmp::Ordering::Less,
+            (Some((file2, offset2)), Some((other_file2, other_offset2))) => {
+                if file2 == other_file2 {
+                    offset2.cmp(&other_offset2)
+                } else {
+                    cmp::Ordering::Equal
+                }
+            }
+            (None, None) => cmp::Ordering::Equal,
+        }
+    }
+
     /// Collect all of this cursor's children into a vec and return them.
     pub(crate) fn collect_children(&self) -> Vec<Cursor> {
         let mut children = vec![];
@@ -782,7 +876,7 @@ impl Cursor {
         unsafe { clang_getCXXAccessSpecifier(self.x) }
     }
 
-    /// Is the cursor's referrent publically accessible in C++?
+    /// Is the cursor's referent publically accessible in C++?
     ///
     /// Returns true if self.access_specifier() is `CX_CXXPublic` or
     /// `CX_CXXInvalidAccessSpecifier`.
@@ -1450,13 +1544,13 @@ impl Type {
     pub(crate) fn is_associated_type(&self) -> bool {
         // This is terrible :(
         fn hacky_parse_associated_type<S: AsRef<str>>(spelling: S) -> bool {
-            lazy_static! {
-                static ref ASSOC_TYPE_RE: regex::Regex = regex::Regex::new(
-                    r"typename type\-parameter\-\d+\-\d+::.+"
-                )
-                .unwrap();
-            }
-            ASSOC_TYPE_RE.is_match(spelling.as_ref())
+            static ASSOC_TYPE_RE: OnceLock<regex::Regex> = OnceLock::new();
+            ASSOC_TYPE_RE
+                .get_or_init(|| {
+                    regex::Regex::new(r"typename type\-parameter\-\d+\-\d+::.+")
+                        .unwrap()
+                })
+                .is_match(spelling.as_ref())
         }
 
         self.kind() == CXType_Unexposed &&
@@ -1531,7 +1625,7 @@ impl SourceLocation {
             let mut line = 0;
             let mut col = 0;
             let mut off = 0;
-            clang_getSpellingLocation(
+            clang_getFileLocation(
                 self.x, &mut file, &mut line, &mut col, &mut off,
             );
             (File { x: file }, line as usize, col as usize, off as usize)
@@ -1736,14 +1830,14 @@ impl TranslationUnit {
     pub(crate) fn parse(
         ix: &Index,
         file: &str,
-        cmd_args: &[String],
+        cmd_args: &[Box<str>],
         unsaved: &[UnsavedFile],
         opts: CXTranslationUnit_Flags,
     ) -> Option<TranslationUnit> {
         let fname = CString::new(file).unwrap();
         let _c_args: Vec<CString> = cmd_args
             .iter()
-            .map(|s| CString::new(s.clone()).unwrap())
+            .map(|s| CString::new(s.as_bytes()).unwrap())
             .collect();
         let c_args: Vec<*const c_char> =
             _c_args.iter().map(|s| s.as_ptr()).collect();
@@ -1791,6 +1885,27 @@ impl TranslationUnit {
         }
     }
 
+    /// Save a translation unit to the given file.
+    pub(crate) fn save(&mut self, file: &str) -> Result<(), CXSaveError> {
+        let file = if let Ok(cstring) = CString::new(file) {
+            cstring
+        } else {
+            return Err(CXSaveError_Unknown);
+        };
+        let ret = unsafe {
+            clang_saveTranslationUnit(
+                self.x,
+                file.as_ptr(),
+                clang_defaultSaveOptions(self.x),
+            )
+        };
+        if ret != 0 {
+            Err(ret)
+        } else {
+            Ok(())
+        }
+    }
+
     /// Is this the null translation unit?
     pub(crate) fn is_null(&self) -> bool {
         self.x.is_null()
@@ -1802,6 +1917,91 @@ impl Drop for TranslationUnit {
         unsafe {
             clang_disposeTranslationUnit(self.x);
         }
+    }
+}
+
+/// Translation unit used for macro fallback parsing
+pub(crate) struct FallbackTranslationUnit {
+    file_path: String,
+    header_path: String,
+    pch_path: String,
+    idx: Box<Index>,
+    tu: TranslationUnit,
+}
+
+impl fmt::Debug for FallbackTranslationUnit {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        write!(fmt, "FallbackTranslationUnit {{ }}")
+    }
+}
+
+impl FallbackTranslationUnit {
+    /// Create a new fallback translation unit
+    pub(crate) fn new(
+        file: String,
+        header_path: String,
+        pch_path: String,
+        c_args: &[Box<str>],
+    ) -> Option<Self> {
+        // Create empty file
+        OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(&file)
+            .ok()?;
+
+        let f_index = Box::new(Index::new(true, false));
+        let f_translation_unit = TranslationUnit::parse(
+            &f_index,
+            &file,
+            c_args,
+            &[],
+            CXTranslationUnit_None,
+        )?;
+        Some(FallbackTranslationUnit {
+            file_path: file,
+            header_path,
+            pch_path,
+            tu: f_translation_unit,
+            idx: f_index,
+        })
+    }
+
+    /// Get reference to underlying translation unit.
+    pub(crate) fn translation_unit(&self) -> &TranslationUnit {
+        &self.tu
+    }
+
+    /// Reparse a translation unit.
+    pub(crate) fn reparse(
+        &mut self,
+        unsaved_contents: &str,
+    ) -> Result<(), CXErrorCode> {
+        let unsaved = &[UnsavedFile::new(&self.file_path, unsaved_contents)];
+        let mut c_unsaved: Vec<CXUnsavedFile> =
+            unsaved.iter().map(|f| f.x).collect();
+        let ret = unsafe {
+            clang_reparseTranslationUnit(
+                self.tu.x,
+                unsaved.len() as c_uint,
+                c_unsaved.as_mut_ptr(),
+                clang_defaultReparseOptions(self.tu.x),
+            )
+        };
+        if ret != 0 {
+            Err(ret)
+        } else {
+            Ok(())
+        }
+    }
+}
+
+impl Drop for FallbackTranslationUnit {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.file_path);
+        let _ = std::fs::remove_file(&self.header_path);
+        let _ = std::fs::remove_file(&self.pch_path);
     }
 }
 
@@ -1846,9 +2046,9 @@ pub(crate) struct UnsavedFile {
 
 impl UnsavedFile {
     /// Construct a new unsaved file with the given `name` and `contents`.
-    pub(crate) fn new(name: String, contents: String) -> UnsavedFile {
-        let name = CString::new(name).unwrap();
-        let contents = CString::new(contents).unwrap();
+    pub(crate) fn new(name: &str, contents: &str) -> UnsavedFile {
+        let name = CString::new(name.as_bytes()).unwrap();
+        let contents = CString::new(contents.as_bytes()).unwrap();
         let x = CXUnsavedFile {
             Filename: name.as_ptr(),
             Contents: contents.as_ptr(),
@@ -2173,7 +2373,7 @@ impl EvalResult {
 
         if unsafe { clang_EvalResult_isUnsignedInt(self.x) } != 0 {
             let value = unsafe { clang_EvalResult_getAsUnsigned(self.x) };
-            if value > i64::max_value() as c_ulonglong {
+            if value > i64::MAX as c_ulonglong {
                 return None;
             }
 
@@ -2181,10 +2381,10 @@ impl EvalResult {
         }
 
         let value = unsafe { clang_EvalResult_getAsLongLong(self.x) };
-        if value > i64::max_value() as c_longlong {
+        if value > i64::MAX as c_longlong {
             return None;
         }
-        if value < i64::min_value() as c_longlong {
+        if value < i64::MIN as c_longlong {
             return None;
         }
         #[allow(clippy::unnecessary_cast)]
@@ -2220,6 +2420,15 @@ impl Drop for EvalResult {
         unsafe { clang_EvalResult_dispose(self.x) };
     }
 }
+/// ABI kinds as defined in
+/// <https://github.com/llvm/llvm-project/blob/ddf1de20a3f7db3bca1ef6ba7e6cbb90aac5fd2d/clang/include/clang/Basic/TargetCXXABI.def>
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+pub(crate) enum ABIKind {
+    /// All the regular targets like Linux, Mac, WASM, etc. implement the Itanium ABI
+    GenericItanium,
+    /// The ABI used when compiling for the MSVC target
+    Microsoft,
+}
 
 /// Target information obtained from libclang.
 #[derive(Debug)]
@@ -2228,6 +2437,8 @@ pub(crate) struct TargetInfo {
     pub(crate) triple: String,
     /// The width of the pointer _in bits_.
     pub(crate) pointer_width: usize,
+    /// The ABI of the target
+    pub(crate) abi: ABIKind,
 }
 
 impl TargetInfo {
@@ -2243,9 +2454,17 @@ impl TargetInfo {
         }
         assert!(pointer_width > 0);
         assert_eq!(pointer_width % 8, 0);
+
+        let abi = if triple.contains("msvc") {
+            ABIKind::Microsoft
+        } else {
+            ABIKind::GenericItanium
+        };
+
         TargetInfo {
             triple,
             pointer_width: pointer_width as usize,
+            abi,
         }
     }
 }

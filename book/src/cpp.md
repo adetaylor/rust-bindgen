@@ -74,7 +74,7 @@ cannot translate into Rust:
   
 * Many C++ specific aspects of calling conventions. For example in the Itanium abi types that are 
   "[non trivial for the purposes of calls](https://itanium-cxx-abi.github.io/cxx-abi/abi.html#non-trivial)" 
-  should be passed by pointer, even if they are otherwise eligable to be passed in a register.
+  should be passed by pointer, even if they are otherwise eligible to be passed in a register.
   Similarly in both the Itanium and MSVC ABIs such types are returned by "hidden parameter", much like
   large structs in C that would not fit into a register. This also applies to types with any base classes
   in the MSVC ABI (see [x64 calling convention](https://learn.microsoft.com/en-us/cpp/build/x64-calling-convention?view=msvc-170#return-values)).
@@ -154,6 +154,6 @@ instance.assume_init_mut().method();
 ```
 
 You can easily verify this fact if you provide a implementation for `MyClass`
-and `method` that prints the the `this` pointer address. However, you can
+and `method` that prints the `this` pointer address. However, you can
 ignore this fact if you know that the original C++ code does not rely on the
 instance address in its internal logic.

@@ -15,47 +15,59 @@ readme = "../README.md"
 repository = "https://github.com/adetaylor/rust-bindgen"
 documentation = "https://docs.rs/bindgen"
 homepage = "https://rust-lang.github.io/rust-bindgen/"
-version = "0.65.1"
+version = "0.69.4"
 edition = "2018"
 build = "build.rs"
 # If you change this, also update README.md and msrv in .github/workflows/bindgen.yml
-rust-version = "1.60.0"
+rust-version = "1.70.0"
 
 [lib]
 name = "autocxx_bindgen"
 path = "lib.rs"
 
 [dependencies]
-bitflags = "1.0.3"
+annotate-snippets = { version = "0.9.1", features = ["color"], optional = true }
+bitflags = "2.2.1"
 cexpr = "0.6"
 clang-sys = { version = "1", features = ["clang_6_0"] }
-lazycell = "1"
-lazy_static = "1"
-peeking_take_while = "0.1.2"
-quote = { version = "1", default-features = false }
-syn = { version = "2.0", features = ["full", "extra-traits", "visit-mut"]}
-regex = { version = "1.5", default-features = false , features = ["std", "unicode"] }
-which = { version = "4.2.1", optional = true, default-features = false }
-prettyplease = { version = "0.2.0" }
-annotate-snippets = { version = "0.9.1", features = ["color"], optional = true }
-shlex = "1"
-rustc-hash = "1.0.1"
-proc-macro2 = { version = "1", default-features = false }
+itertools = { version = ">=0.10,<0.14", default-features = false }
 log = { version = "0.4", optional = true }
 itertools = "0.10.0"
+prettyplease = { version = "0.2.7", optional = true, features = ["verbatim"] }
+proc-macro2 = { version = "1", default-features = false }
+quote = { version = "1", default-features = false }
+regex = { version = "1.5.3", default-features = false, features = ["std", "unicode-perl"] }
+rustc-hash = "1.0.1"
+shlex = "1"
+syn = { version = "2.0", features = ["full", "extra-traits", "visit-mut"] }
 
 [features]
-default = ["logging", "runtime", "which-rustfmt"]
-logging = ["log"]
+default = ["logging", "prettyplease", "runtime"]
+logging = ["dep:log"]
 static = ["clang-sys/static"]
 runtime = ["clang-sys/runtime"]
-# Dynamically discover a `rustfmt` binary using the `which` crate
-which-rustfmt = ["which"]
-__cli = []
-experimental = ["annotate-snippets"]
+# This feature is no longer used for anything and should be removed in bindgen 0.70
+which-rustfmt = []
+experimental = ["dep:annotate-snippets"]
 
-# These features only exist for CI testing -- don't use them if you're not hacking
-# on bindgen!
-testing_only_extra_assertions = []
-testing_only_libclang_9 = []
-testing_only_libclang_5 = []
+## The following features are for internal use and they shouldn't be used if
+## you're not hacking on bindgen
+# Features used by `bindgen-cli`
+__cli = []
+# Features used for CI testing
+__testing_only_extra_assertions = []
+__testing_only_libclang_9 = []
+__testing_only_libclang_16 = []
+
+[package.metadata.docs.rs]
+features = ["experimental"]
+
+[package.metadata.release]
+release = true
+pre-release-hook = ["../node_modules/doctoc/doctoc.js", "../CHANGELOG.md"]
+
+# Add version and date to changelog file
+[[package.metadata.release.pre-release-replacements]]
+file = "../CHANGELOG.md"
+search = "# Unreleased"
+replace = "# Unreleased\n## Added\n## Changed\n## Removed\n## Fixed\n## Security\n\n# {{version}} ({{date}})"

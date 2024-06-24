@@ -1,17 +1,11 @@
-#![allow(
-    dead_code,
-    non_snake_case,
-    non_camel_case_types,
-    non_upper_case_globals
-)]
-
+#![allow(dead_code, non_snake_case, non_camel_case_types, non_upper_case_globals)]
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, Hash, PartialEq, Eq)]
 pub struct OpaqueTemplate {
     pub _address: u8,
 }
-/// This should not end up deriving Debug/Hash because its `mBlah` field cannot derive
-/// Debug/Hash because the instantiation's definition cannot derive Debug/Hash.
+/** This should not end up deriving Debug/Hash because its `mBlah` field cannot derive
+ Debug/Hash because the instantiation's definition cannot derive Debug/Hash.*/
 #[repr(C)]
 pub struct ContainsOpaqueTemplate {
     pub mBlah: [u32; 101usize],
@@ -19,38 +13,27 @@ pub struct ContainsOpaqueTemplate {
 }
 #[test]
 fn bindgen_test_layout_ContainsOpaqueTemplate() {
-    const UNINIT: ::std::mem::MaybeUninit<ContainsOpaqueTemplate> =
-        ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<ContainsOpaqueTemplate> = ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<ContainsOpaqueTemplate>(),
         408usize,
-        concat!("Size of: ", stringify!(ContainsOpaqueTemplate))
+        "Size of ContainsOpaqueTemplate",
     );
     assert_eq!(
         ::std::mem::align_of::<ContainsOpaqueTemplate>(),
         4usize,
-        concat!("Alignment of ", stringify!(ContainsOpaqueTemplate))
+        "Alignment of ContainsOpaqueTemplate",
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).mBlah) as usize - ptr as usize },
         0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(ContainsOpaqueTemplate),
-            "::",
-            stringify!(mBlah)
-        )
+        "Offset of field: ContainsOpaqueTemplate::mBlah",
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).mBaz) as usize - ptr as usize },
         404usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(ContainsOpaqueTemplate),
-            "::",
-            stringify!(mBaz)
-        )
+        "Offset of field: ContainsOpaqueTemplate::mBaz",
     );
 }
 impl Default for ContainsOpaqueTemplate {
@@ -67,8 +50,8 @@ impl ::std::cmp::PartialEq for ContainsOpaqueTemplate {
         &self.mBlah[..] == &other.mBlah[..] && self.mBaz == other.mBaz
     }
 }
-/// This should not end up deriving Debug/Hash either, for similar reasons, although
-/// we're exercising base member edges now.
+/** This should not end up deriving Debug/Hash either, for similar reasons, although
+ we're exercising base member edges now.*/
 #[repr(C)]
 pub struct InheritsOpaqueTemplate {
     pub _base: [u8; 401usize],
@@ -76,28 +59,22 @@ pub struct InheritsOpaqueTemplate {
 }
 #[test]
 fn bindgen_test_layout_InheritsOpaqueTemplate() {
-    const UNINIT: ::std::mem::MaybeUninit<InheritsOpaqueTemplate> =
-        ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<InheritsOpaqueTemplate> = ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<InheritsOpaqueTemplate>(),
         416usize,
-        concat!("Size of: ", stringify!(InheritsOpaqueTemplate))
+        "Size of InheritsOpaqueTemplate",
     );
     assert_eq!(
         ::std::mem::align_of::<InheritsOpaqueTemplate>(),
         8usize,
-        concat!("Alignment of ", stringify!(InheritsOpaqueTemplate))
+        "Alignment of InheritsOpaqueTemplate",
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).wow) as usize - ptr as usize },
         408usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(InheritsOpaqueTemplate),
-            "::",
-            stringify!(wow)
-        )
+        "Offset of field: InheritsOpaqueTemplate::wow",
     );
 }
 impl Default for InheritsOpaqueTemplate {

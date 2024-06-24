@@ -1,7 +1,3 @@
-// Don't want to copy that nasty `cfg` below...
-#[allow(unused_extern_crates)]
-extern crate autocxx_bindgen;
-
 /// A sanity test that we can generate bindings for Stylo.
 ///
 /// We don't assert on expected output because its just too big. The output will
@@ -14,10 +10,13 @@ extern crate autocxx_bindgen;
 /// how long bindings generation takes for Stylo. Stylo bindings generation
 /// takes too long to be a proper `#[bench]`.
 #[test]
-#[cfg(not(any(debug_assertions, feature = "testing_only_extra_assertions",)))]
+#[cfg(not(any(
+    debug_assertions,
+    feature = "__testing_only_extra_assertions",
+)))]
 #[cfg(any(
-    feature = "testing_only_libclang_5",
-    feature = "testing_only_libclang_9"
+    feature = "__testing_only_libclang_9",
+    feature = "__testing_only_libclang_16"
 ))]
 fn sanity_check_can_generate_stylo_bindings() {
     use std::time::Instant;

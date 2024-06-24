@@ -39,7 +39,7 @@ pub(crate) struct ObjCInterface {
     /// The direct parent for this interface.
     pub(crate) parent_class: Option<ItemId>,
 
-    /// List of the methods defined in this interfae
+    /// List of the methods defined in this interface
     methods: Vec<ObjCMethod>,
 
     class_methods: Vec<ObjCMethod>,
@@ -137,7 +137,7 @@ impl ObjCInterface {
                 CXCursor_ObjCClassRef => {
                     if cursor.kind() == CXCursor_ObjCCategoryDecl {
                         // We are actually a category extension, and we found the reference
-                        // to the original interface, so name this interface approriately
+                        // to the original interface, so name this interface appropriately
                         interface.name = c.spelling();
                         interface.category = Some(cursor.spelling());
                     }
@@ -253,17 +253,36 @@ impl ObjCMethod {
         let split_name: Vec<Option<Ident>> = self
             .name
             .split(':')
-            .map(|name| {
+            .enumerate()
+            .map(|(idx, name)| {
                 if name.is_empty() {
                     None
+                } else if idx == 0 {
+                    // Try to parse the method name as an identifier. Having a keyword is ok
+                    // unless it is `crate`, `self`, `super` or `Self`, so we try to add the `_`
+                    // suffix to it and parse it.
+                    if ["crate", "self", "super", "Self"].contains(&name) {
+                        Some(Ident::new(
+                            &format!("{}_", name),
+                            Span::call_site(),
+                        ))
+                    } else {
+                        Some(Ident::new(name, Span::call_site()))
+                    }
                 } else {
-                    // Try to parse the current name as an identifier. This might fail if the
-                    // name is a keyword so we try to prepend "r#" to it and parse again. If
-                    // this also fails, we panic with the first error.
+                    // Try to parse the current joining name as an identifier. This might fail if the name
+                    // is a keyword, so we try to  "r#" to it and parse again, this could also fail
+                    // if the name is `crate`, `self`, `super` or `Self`, so we try to add the `_`
+                    // suffix to it and parse again. If this also fails, we panic with the first
+                    // error.
                     Some(
                         syn::parse_str::<Ident>(name)
                             .or_else(|err| {
                                 syn::parse_str::<Ident>(&format!("r#{}", name))
+                                    .map_err(|_| err)
+                            })
+                            .or_else(|err| {
+                                syn::parse_str::<Ident>(&format!("{}_", name))
                                     .map_err(|_| err)
                             })
                             .expect("Invalid identifier"),

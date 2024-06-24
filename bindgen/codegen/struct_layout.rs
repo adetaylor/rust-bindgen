@@ -6,7 +6,8 @@ use crate::ir::comp::CompInfo;
 use crate::ir::context::BindgenContext;
 use crate::ir::layout::Layout;
 use crate::ir::ty::{Type, TypeKind};
-use proc_macro2::{self, Ident, Span};
+use crate::FieldVisibilityKind;
+use proc_macro2::{Ident, Span};
 use std::cmp;
 
 const MAX_GUARANTEED_ALIGN: usize = 8;
@@ -26,6 +27,8 @@ pub(crate) struct StructLayoutTracker<'a> {
     latest_field_layout: Option<Layout>,
     max_field_align: usize,
     last_field_was_bitfield: bool,
+    visibility: FieldVisibilityKind,
+    last_field_was_flexible_array: bool,
 }
 
 /// Returns a size aligned to a given value.
@@ -88,15 +91,17 @@ impl<'a> StructLayoutTracker<'a> {
         comp: &'a CompInfo,
         ty: &'a Type,
         name: &'a str,
+        visibility: FieldVisibilityKind,
+        is_packed: bool,
     ) -> Self {
         let known_type_layout = ty.layout(ctx);
-        let is_packed = comp.is_packed(ctx, known_type_layout.as_ref());
         let (is_rust_union, can_copy_union_fields) =
             comp.is_rust_union(ctx, known_type_layout.as_ref(), name);
         StructLayoutTracker {
             name,
             ctx,
             comp,
+            visibility,
             is_packed,
             known_type_layout,
             is_rust_union,
@@ -106,6 +111,7 @@ impl<'a> StructLayoutTracker<'a> {
             latest_field_layout: None,
             max_field_align: 0,
             last_field_was_bitfield: false,
+            last_field_was_flexible_array: false,
         }
     }
 
@@ -115,6 +121,10 @@ impl<'a> StructLayoutTracker<'a> {
 
     pub(crate) fn is_rust_union(&self) -> bool {
         self.is_rust_union
+    }
+
+    pub(crate) fn saw_flexible_array(&mut self) {
+        self.last_field_was_flexible_array = true;
     }
 
     pub(crate) fn saw_vtable(&mut self) {
@@ -152,9 +162,7 @@ impl<'a> StructLayoutTracker<'a> {
 
         self.latest_field_layout = Some(layout);
         self.last_field_was_bitfield = true;
-        // NB: We intentionally don't update the max_field_align here, since our
-        // bitfields code doesn't necessarily guarantee it, so we need to
-        // actually generate the dummy alignment.
+        self.max_field_align = cmp::max(self.max_field_align, layout.align);
     }
 
     /// Returns a padding field if necessary for a given new field _before_
@@ -210,7 +218,10 @@ impl<'a> StructLayoutTracker<'a> {
                     0
                 } else if !self.is_packed {
                     self.padding_bytes(field_layout)
-                } else if let Some(l) = self.known_type_layout {
+                } else if let Some(mut l) = self.known_type_layout {
+                    if field_layout.align < l.align {
+                        l.align = field_layout.align;
+                    }
                     self.padding_bytes(l)
                 } else {
                     0
@@ -287,6 +298,11 @@ impl<'a> StructLayoutTracker<'a> {
 
         // Padding doesn't make sense for rust unions.
         if self.is_rust_union {
+            return None;
+        }
+
+        // Also doesn't make sense for structs with flexible array members
+        if self.last_field_was_flexible_array {
             return None;
         }
 
@@ -397,8 +413,10 @@ impl<'a> StructLayoutTracker<'a> {
 
         self.max_field_align = cmp::max(self.max_field_align, layout.align);
 
+        let vis = super::access_specifier(self.visibility);
+
         quote! {
-            pub #padding_field_name : #ty ,
+            #vis #padding_field_name : #ty ,
         }
     }
 

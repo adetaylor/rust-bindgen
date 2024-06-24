@@ -7,19 +7,14 @@ pub use crate::ir::int::IntKind;
 use std::fmt;
 
 /// An enum to allow ignoring parsing of macros.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Default)]
 pub enum MacroParsingBehavior {
     /// Ignore the macro, generating no code for it, or anything that depends on
     /// it.
     Ignore,
     /// The default behavior bindgen would have otherwise.
+    #[default]
     Default,
-}
-
-impl Default for MacroParsingBehavior {
-    fn default() -> Self {
-        MacroParsingBehavior::Default
-    }
 }
 
 /// A trait to allow configuring different kinds of types in different
@@ -99,6 +94,9 @@ pub trait ParseCallbacks: fmt::Debug {
         None
     }
 
+    /// This will be called on every header filename passed to (`Builder::header`)[`crate::Builder::header`].
+    fn header_file(&self, _filename: &str) {}
+
     /// This will be called on every file inclusion, with the full path of the included file.
     fn include_file(&self, _filename: &str) {}
 
@@ -133,6 +131,27 @@ pub trait ParseCallbacks: fmt::Debug {
 
     /// Process a source code comment.
     fn process_comment(&self, _comment: &str) -> Option<String> {
+        None
+    }
+
+    /// Potentially override the visibility of a composite type field.
+    ///
+    /// Caution: This allows overriding standard C++ visibility inferred by
+    /// `respect_cxx_access_specs`.
+    fn field_visibility(
+        &self,
+        _info: FieldInfo<'_>,
+    ) -> Option<crate::FieldVisibilityKind> {
+        None
+    }
+
+    /// Process a function name that as exactly one `va_list` argument
+    /// to be wrapped as a variadic function with the wrapped static function
+    /// feature.
+    ///
+    /// The returned string is new function name.
+    #[cfg(feature = "experimental")]
+    fn wrap_as_variadic_fn(&self, _name: &str) -> Option<String> {
         None
     }
 }
@@ -175,4 +194,15 @@ pub enum ItemKind {
     Function,
     /// A Variable
     Var,
+}
+
+/// Relevant information about a field for which visibility can be determined using
+/// [`ParseCallbacks::field_visibility`].
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct FieldInfo<'a> {
+    /// The name of the type.
+    pub type_name: &'a str,
+    /// The name of the field.
+    pub field_name: &'a str,
 }

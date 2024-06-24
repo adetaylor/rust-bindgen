@@ -1,12 +1,6 @@
-#![allow(
-    dead_code,
-    non_snake_case,
-    non_camel_case_types,
-    non_upper_case_globals
-)]
+#![allow(dead_code, non_snake_case, non_camel_case_types, non_upper_case_globals)]
 #![cfg(target_os = "macos")]
-
-use objc::{self, class, msg_send, sel, sel_impl};
+use objc::{self, msg_send, sel, sel_impl, class};
 #[allow(non_camel_case_types)]
 pub type id = *mut objc::runtime::Object;
 #[repr(transparent)]
@@ -31,32 +25,11 @@ pub trait IFoo: Sized + std::ops::Deref {}
 pub struct FooStruct {
     pub foo: Foo,
 }
-#[test]
-fn bindgen_test_layout_FooStruct() {
-    const UNINIT: ::std::mem::MaybeUninit<FooStruct> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<FooStruct>(),
-        8usize,
-        concat!("Size of: ", stringify!(FooStruct))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<FooStruct>(),
-        8usize,
-        concat!("Alignment of ", stringify!(FooStruct))
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).foo) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(FooStruct),
-            "::",
-            stringify!(foo)
-        )
-    );
-}
+const _: () = {
+    ["Size of FooStruct"][::std::mem::size_of::<FooStruct>() - 8usize];
+    ["Alignment of FooStruct"][::std::mem::align_of::<FooStruct>() - 8usize];
+    ["Offset of field: FooStruct::foo"][::std::mem::offset_of!(FooStruct, foo) - 0usize];
+};
 impl Default for FooStruct {
     fn default() -> Self {
         let mut s = ::std::mem::MaybeUninit::<Self>::uninit();

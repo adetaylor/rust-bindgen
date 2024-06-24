@@ -20,13 +20,12 @@ use super::ty::{Type, TypeKind};
 use crate::clang;
 use crate::parse::{ClangSubItemParser, ParseError, ParseResult};
 
-use lazycell::LazyCell;
-
-use std::cell::Cell;
+use std::cell::{Cell, OnceCell};
 use std::collections::BTreeSet;
 use std::fmt::Write;
 use std::io;
 use std::iter;
+use std::sync::OnceLock;
 
 /// A trait to get the canonical name from an item.
 ///
@@ -85,12 +84,6 @@ pub(crate) trait HasTypeParamInArray {
     fn has_type_param_in_array(&self, ctx: &BindgenContext) -> bool;
 }
 
-/// A trait for determining if some IR thing has float or not.
-pub(crate) trait HasFloat {
-    /// Returns `true` if the thing has float, and `false` otherwise.
-    fn has_float(&self, ctx: &BindgenContext) -> bool;
-}
-
 /// A trait for iterating over an item and its parents and up its ancestor chain
 /// up to (but not including) the implicit root module.
 pub(crate) trait ItemAncestors {
@@ -98,13 +91,13 @@ pub(crate) trait ItemAncestors {
     fn ancestors<'a>(&self, ctx: &'a BindgenContext) -> ItemAncestorsIter<'a>;
 }
 
-#[cfg(testing_only_extra_assertions)]
+#[cfg(feature = "__testing_only_extra_assertions")]
 type DebugOnlyItemSet = ItemSet;
 
-#[cfg(not(testing_only_extra_assertions))]
+#[cfg(not(feature = "__testing_only_extra_assertions"))]
 struct DebugOnlyItemSet;
 
-#[cfg(not(testing_only_extra_assertions))]
+#[cfg(not(feature = "__testing_only_extra_assertions"))]
 impl DebugOnlyItemSet {
     fn new() -> Self {
         DebugOnlyItemSet
@@ -386,7 +379,7 @@ pub(crate) struct Item {
     ///
     /// Note that only structs, unions, and enums get a local type ID. In any
     /// case this is an implementation detail.
-    local_id: LazyCell<usize>,
+    local_id: OnceCell<usize>,
 
     /// The next local ID to use for a child or template instantiation.
     next_child_local_id: Cell<usize>,
@@ -395,11 +388,11 @@ pub(crate) struct Item {
     ///
     /// This is a fairly used operation during codegen so this makes bindgen
     /// considerably faster in those cases.
-    canonical_name: LazyCell<String>,
+    canonical_name: OnceCell<String>,
 
     /// The path to use for allowlisting and other name-based checks, as
     /// returned by `path_for_allowlisting`, lazily constructed.
-    path_for_allowlisting: LazyCell<Vec<String>>,
+    path_for_allowlisting: OnceCell<Vec<String>>,
 
     /// A doc comment over the item, if any.
     comment: Option<String>,
@@ -437,10 +430,10 @@ impl Item {
         debug_assert!(id != parent_id || kind.is_module());
         Item {
             id,
-            local_id: LazyCell::new(),
+            local_id: OnceCell::new(),
             next_child_local_id: Cell::new(1),
-            canonical_name: LazyCell::new(),
-            path_for_allowlisting: LazyCell::new(),
+            canonical_name: OnceCell::new(),
+            path_for_allowlisting: OnceCell::new(),
             parent_id,
             comment,
             annotations: annotations.unwrap_or_default(),
@@ -541,7 +534,7 @@ impl Item {
     /// below this item's lexical scope, meaning that this can be useful for
     /// generating relatively stable identifiers within a scope.
     pub(crate) fn local_id(&self, ctx: &BindgenContext) -> usize {
-        *self.local_id.borrow_with(|| {
+        *self.local_id.get_or_init(|| {
             let parent = ctx.resolve_item(self.parent_id);
             parent.next_child_local_id()
         })
@@ -668,8 +661,11 @@ impl Item {
                 ItemKind::Function(..) => {
                     ctx.options().blocklisted_functions.matches(&name)
                 }
-                // TODO: Add constant / namespace blocklisting?
-                ItemKind::Var(..) | ItemKind::Module(..) => false,
+                ItemKind::Var(..) => {
+                    ctx.options().blocklisted_vars.matches(&name)
+                }
+                // TODO: Add namespace blocklisting?
+                ItemKind::Module(..) => false,
             }
     }
 
@@ -1072,7 +1068,7 @@ impl Item {
         ctx: &BindgenContext,
     ) -> &Vec<String> {
         self.path_for_allowlisting
-            .borrow_with(|| self.compute_path(ctx, UserMangled::No))
+            .get_or_init(|| self.compute_path(ctx, UserMangled::No))
     }
 
     fn compute_path(
@@ -1229,29 +1225,6 @@ impl HasTypeParamInArray for Item {
             "You're not supposed to call this yet"
         );
         ctx.lookup_has_type_param_in_array(self.id())
-    }
-}
-
-impl<T> HasFloat for T
-where
-    T: Copy + Into<ItemId>,
-{
-    fn has_float(&self, ctx: &BindgenContext) -> bool {
-        debug_assert!(
-            ctx.in_codegen_phase(),
-            "You're not supposed to call this yet"
-        );
-        ctx.lookup_has_float(*self)
-    }
-}
-
-impl HasFloat for Item {
-    fn has_float(&self, ctx: &BindgenContext) -> bool {
-        debug_assert!(
-            ctx.in_codegen_phase(),
-            "You're not supposed to call this yet"
-        );
-        ctx.lookup_has_float(self.id())
     }
 }
 
@@ -1464,53 +1437,58 @@ impl Item {
             }
         }
 
-        // Guess how does clang treat extern "C" blocks?
-        if cursor.kind() == CXCursor_UnexposedDecl {
-            Err(ParseError::Recurse)
-        } else {
+        match cursor.kind() {
+            // On Clang 18+, extern "C" is reported accurately as a LinkageSpec.
+            // Older LLVM treat it as UnexposedDecl.
+            CXCursor_LinkageSpec | CXCursor_UnexposedDecl => {
+                Err(ParseError::Recurse)
+            }
+
             // We allowlist cursors here known to be unhandled, to prevent being
             // too noisy about this.
-            match cursor.kind() {
-                CXCursor_MacroDefinition |
-                CXCursor_MacroExpansion |
-                CXCursor_UsingDeclaration |
-                CXCursor_UsingDirective |
-                CXCursor_StaticAssert |
-                CXCursor_FunctionTemplate => {
-                    debug!(
+            CXCursor_MacroDefinition |
+            CXCursor_MacroExpansion |
+            CXCursor_UsingDeclaration |
+            CXCursor_UsingDirective |
+            CXCursor_StaticAssert |
+            CXCursor_FunctionTemplate => {
+                debug!(
+                    "Unhandled cursor kind {:?}: {:?}",
+                    cursor.kind(),
+                    cursor
+                );
+                Err(ParseError::Continue)
+            }
+
+            CXCursor_InclusionDirective => {
+                let file = cursor.get_included_file_name();
+                match file {
+                    None => {
+                        warn!("Inclusion of a nameless file in {:?}", cursor);
+                    }
+                    Some(included_file) => {
+                        for cb in &ctx.options().parse_callbacks {
+                            cb.include_file(&included_file);
+                        }
+
+                        ctx.add_dep(included_file.into_boxed_str());
+                    }
+                }
+                Err(ParseError::Continue)
+            }
+
+            _ => {
+                // ignore toplevel operator overloads
+                let spelling = cursor.spelling();
+                if !spelling.starts_with("operator") {
+                    warn!(
                         "Unhandled cursor kind {:?}: {:?}",
                         cursor.kind(),
                         cursor
                     );
                 }
-                CXCursor_InclusionDirective => {
-                    let file = cursor.get_included_file_name();
-                    match file {
-                        None => {
-                            warn!(
-                                "Inclusion of a nameless file in {:?}",
-                                cursor
-                            );
-                        }
-                        Some(filename) => {
-                            ctx.include_file(filename);
-                        }
-                    }
-                }
-                _ => {
-                    // ignore toplevel operator overloads
-                    let spelling = cursor.spelling();
-                    if !spelling.starts_with("operator") {
-                        warn!(
-                            "Unhandled cursor kind {:?}: {:?}",
-                            cursor.kind(),
-                            cursor
-                        );
-                    }
-                }
+                Err(ParseError::Continue)
             }
-
-            Err(ParseError::Continue)
         }
     }
 
@@ -1860,10 +1838,10 @@ impl Item {
             refd: &clang::Cursor,
             spelling: &str,
         ) -> bool {
-            lazy_static! {
-                static ref ANON_TYPE_PARAM_RE: regex::Regex =
-                    regex::Regex::new(r"^type\-parameter\-\d+\-\d+$").unwrap();
-            }
+            static ANON_TYPE_PARAM_RE: OnceLock<regex::Regex> = OnceLock::new();
+            let anon_type_param_re = ANON_TYPE_PARAM_RE.get_or_init(|| {
+                regex::Regex::new(r"^type\-parameter\-\d+\-\d+$").unwrap()
+            });
 
             if refd.kind() != clang_sys::CXCursor_TemplateTypeParameter {
                 return false;
@@ -1872,7 +1850,7 @@ impl Item {
             let refd_spelling = refd.spelling();
             refd_spelling == spelling ||
                 // Allow for anonymous template parameters.
-                (refd_spelling.is_empty() && ANON_TYPE_PARAM_RE.is_match(spelling.as_ref()))
+                (refd_spelling.is_empty() && anon_type_param_re.is_match(spelling.as_ref()))
         }
 
         let definition = if is_template_with_spelling(&location, &ty_spelling) {
@@ -1962,7 +1940,7 @@ impl ItemCanonicalName for Item {
             "You're not supposed to call this yet"
         );
         self.canonical_name
-            .borrow_with(|| {
+            .get_or_init(|| {
                 let in_namespace = ctx.options().enable_cxx_namespaces ||
                     ctx.options().disable_name_namespacing;
 

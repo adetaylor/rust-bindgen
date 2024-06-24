@@ -129,27 +129,23 @@ fn default_macro_constant_type(ctx: &BindgenContext, value: i64) -> IntKind {
         ctx.options().default_macro_constant_type ==
             MacroTypeVariation::Signed
     {
-        if value < i32::min_value() as i64 || value > i32::max_value() as i64 {
+        if value < i32::MIN as i64 || value > i32::MAX as i64 {
             IntKind::I64
         } else if !ctx.options().fit_macro_constants ||
-            value < i16::min_value() as i64 ||
-            value > i16::max_value() as i64
+            value < i16::MIN as i64 ||
+            value > i16::MAX as i64
         {
             IntKind::I32
-        } else if value < i8::min_value() as i64 ||
-            value > i8::max_value() as i64
-        {
+        } else if value < i8::MIN as i64 || value > i8::MAX as i64 {
             IntKind::I16
         } else {
             IntKind::I8
         }
-    } else if value > u32::max_value() as i64 {
+    } else if value > u32::MAX as i64 {
         IntKind::U64
-    } else if !ctx.options().fit_macro_constants ||
-        value > u16::max_value() as i64
-    {
+    } else if !ctx.options().fit_macro_constants || value > u16::MAX as i64 {
         IntKind::U32
-    } else if value > u8::max_value() as i64 {
+    } else if value > u8::MAX as i64 {
         IntKind::U16
     } else {
         IntKind::U8
@@ -243,7 +239,7 @@ impl ClangSubItemParser for Var {
                                 c as u8
                             }
                             CChar::Raw(c) => {
-                                assert!(c <= ::std::u8::MAX as u64);
+                                assert!(c <= u8::MAX as u64);
                                 c as u8
                             }
                         };
@@ -389,9 +385,51 @@ impl ClangSubItemParser for Var {
     }
 }
 
+/// This function uses a [`FallbackTranslationUnit`][clang::FallbackTranslationUnit] to parse each
+/// macro that cannot be parsed by the normal bindgen process for `#define`s.
+///
+/// To construct the [`FallbackTranslationUnit`][clang::FallbackTranslationUnit], first precompiled
+/// headers are generated for all input headers. An empty temporary `.c` file is generated to pass
+/// to the translation unit. On the evaluation of each macro, a [`String`] is generated with the
+/// new contents of the empty file and passed in for reparsing. The precompiled headers and
+/// preservation of the [`FallbackTranslationUnit`][clang::FallbackTranslationUnit] across macro
+/// evaluations are both optimizations that have significantly improved the performance.
+fn parse_macro_clang_fallback(
+    ctx: &mut BindgenContext,
+    cursor: &clang::Cursor,
+) -> Option<(Vec<u8>, cexpr::expr::EvalResult)> {
+    if !ctx.options().clang_macro_fallback {
+        return None;
+    }
+
+    let ftu = ctx.try_ensure_fallback_translation_unit()?;
+    let contents = format!("int main() {{ {}; }}", cursor.spelling(),);
+    ftu.reparse(&contents).ok()?;
+    // Children of root node of AST
+    let root_children = ftu.translation_unit().cursor().collect_children();
+    // Last child in root is function declaration
+    // Should be FunctionDecl
+    let main_func = root_children.last()?;
+    // Children should all be statements in function declaration
+    let all_stmts = main_func.collect_children();
+    // First child in all_stmts should be the statement containing the macro to evaluate
+    // Should be CompoundStmt
+    let macro_stmt = all_stmts.first()?;
+    // Children should all be expressions from the compound statement
+    let paren_exprs = macro_stmt.collect_children();
+    // First child in all_exprs is the expression utilizing the given macro to be evaluated
+    // Should  be ParenExpr
+    let paren = paren_exprs.first()?;
+
+    Some((
+        cursor.spelling().into_bytes(),
+        cexpr::expr::EvalResult::Int(Wrapping(paren.evaluate()?.as_int()?)),
+    ))
+}
+
 /// Try and parse a macro using all the macros parsed until now.
 fn parse_macro(
-    ctx: &BindgenContext,
+    ctx: &mut BindgenContext,
     cursor: &clang::Cursor,
 ) -> Option<(Vec<u8>, cexpr::expr::EvalResult)> {
     use cexpr::expr;
@@ -402,7 +440,7 @@ fn parse_macro(
 
     match parser.macro_definition(&cexpr_tokens) {
         Ok((_, (id, val))) => Some((id.into(), val)),
-        _ => None,
+        _ => parse_macro_clang_fallback(ctx, cursor),
     }
 }
 

@@ -1,24 +1,28 @@
 use autocxx_bindgen as bindgen;
 use bindgen::callbacks::TypeKind;
 use bindgen::{
-    builder, AliasVariation, Builder, CodegenConfig, EnumVariation,
+    builder, Abi, AliasVariation, Builder, CodegenConfig, EnumVariation,
     FieldVisibilityKind, Formatter, MacroTypeVariation, NonCopyUnionStyle,
     RegexSet, RustTarget, DEFAULT_ANON_FIELDS_PREFIX, RUST_TARGET_STRINGS,
 };
-use clap::Parser;
+use clap::error::{Error, ErrorKind};
+use clap::{CommandFactory, Parser};
 use std::fs::File;
-use std::io::{self, Error, ErrorKind};
-use std::path::PathBuf;
+use std::io;
+use std::path::{Path, PathBuf};
+use std::process::exit;
 
 fn rust_target_help() -> String {
     format!(
-        "Version of the Rust compiler to target. Valid options are: {:?}. Defaults to {:?}.",
+        "Version of the Rust compiler to target. Valid options are: {:?}. Defaults to {}.",
         RUST_TARGET_STRINGS,
-        String::from(RustTarget::default())
+        RustTarget::default()
     )
 }
 
-fn parse_codegen_config(what_to_generate: &str) -> io::Result<CodegenConfig> {
+fn parse_codegen_config(
+    what_to_generate: &str,
+) -> Result<CodegenConfig, Error> {
     let mut config = CodegenConfig::empty();
     for what in what_to_generate.split(',') {
         match what {
@@ -29,9 +33,9 @@ fn parse_codegen_config(what_to_generate: &str) -> io::Result<CodegenConfig> {
             "constructors" => config.insert(CodegenConfig::CONSTRUCTORS),
             "destructors" => config.insert(CodegenConfig::DESTRUCTORS),
             otherwise => {
-                return Err(Error::new(
-                    ErrorKind::Other,
-                    format!("Unknown generate item: {}", otherwise),
+                return Err(Error::raw(
+                    ErrorKind::InvalidValue,
+                    format!("Unknown codegen item kind: {}", otherwise),
                 ));
             }
         }
@@ -40,10 +44,54 @@ fn parse_codegen_config(what_to_generate: &str) -> io::Result<CodegenConfig> {
     Ok(config)
 }
 
+fn parse_rustfmt_config_path(path_str: &str) -> Result<PathBuf, Error> {
+    let path = Path::new(path_str);
+
+    if !path.is_absolute() {
+        return Err(Error::raw(
+            ErrorKind::InvalidValue,
+            "--rustfmt-configuration-file needs to be an absolute path!",
+        ));
+    }
+
+    if path.to_str().is_none() {
+        return Err(Error::raw(
+            ErrorKind::InvalidUtf8,
+            "--rustfmt-configuration-file contains non-valid UTF8 characters.",
+        ));
+    }
+
+    Ok(path.to_path_buf())
+}
+
+fn parse_abi_override(abi_override: &str) -> Result<(Abi, String), Error> {
+    let (regex, abi_str) = abi_override
+        .rsplit_once('=')
+        .ok_or_else(|| Error::raw(ErrorKind::InvalidValue, "Missing `=`"))?;
+
+    let abi = abi_str
+        .parse()
+        .map_err(|err| Error::raw(ErrorKind::InvalidValue, err))?;
+
+    Ok((abi, regex.to_owned()))
+}
+
+fn parse_custom_derive(
+    custom_derive: &str,
+) -> Result<(Vec<String>, String), Error> {
+    let (regex, derives) = custom_derive
+        .rsplit_once('=')
+        .ok_or_else(|| Error::raw(ErrorKind::InvalidValue, "Missing `=`"))?;
+
+    let derives = derives.split(',').map(|s| s.to_owned()).collect();
+
+    Ok((derives, regex.to_owned()))
+}
+
 #[derive(Parser, Debug)]
 #[clap(
     about = "Generates Rust bindings from C/C++ headers.",
-    override_usage = "bindgen [FLAGS] [OPTIONS] [HEADER] -- [CLANG_ARGS]...",
+    override_usage = "bindgen <FLAGS> <OPTIONS> <HEADER> -- <CLANG_ARGS>...",
     trailing_var_arg = true
 )]
 struct BindgenCommand {
@@ -52,8 +100,8 @@ struct BindgenCommand {
     /// Path to write depfile to.
     #[arg(long)]
     depfile: Option<String>,
-    /// The default style of code used to generate enums.
-    #[arg(long, value_name = "VARIANT")]
+    /// The default STYLE of code used to generate enums.
+    #[arg(long, value_name = "STYLE")]
     default_enum_style: Option<EnumVariation>,
     /// Mark any enum whose name matches REGEX as a set of bitfield flags.
     #[arg(long, value_name = "REGEX")]
@@ -73,11 +121,11 @@ struct BindgenCommand {
     /// Mark any enum whose name matches REGEX as a module of constants.
     #[arg(long, value_name = "REGEX")]
     constified_enum_module: Vec<String>,
-    /// The default signed/unsigned type for C macro constants.
-    #[arg(long, value_name = "VARIANT")]
+    /// The default signed/unsigned TYPE for C macro constants.
+    #[arg(long, value_name = "TYPE")]
     default_macro_constant_type: Option<MacroTypeVariation>,
-    /// The default style of code used to generate typedefs.
-    #[arg(long, value_name = "VARIANT")]
+    /// The default STYLE of code used to generate typedefs.
+    #[arg(long, value_name = "STYLE")]
     default_alias_style: Option<AliasVariation>,
     /// Mark any typedef alias whose name matches REGEX to use normal type aliasing.
     #[arg(long, value_name = "REGEX")]
@@ -88,7 +136,7 @@ struct BindgenCommand {
     /// Mark any typedef alias whose name matches REGEX to have a new type with Deref and DerefMut to the inner type.
     #[arg(long, value_name = "REGEX")]
     new_type_alias_deref: Vec<String>,
-    /// The default style of code used to generate unions with non-Copy members. Note that ManuallyDrop was first stabilized in Rust 1.20.0.
+    /// The default STYLE of code used to generate unions with non-Copy members. Note that ManuallyDrop was first stabilized in Rust 1.20.0.
     #[arg(long, value_name = "STYLE")]
     default_non_copy_union_style: Option<NonCopyUnionStyle>,
     /// Mark any union whose name matches REGEX and who has a non-Copy member to use a bindgen-generated wrapper for fields.
@@ -109,6 +157,9 @@ struct BindgenCommand {
     /// Mark FILE as hidden.
     #[arg(long, value_name = "FILE")]
     blocklist_file: Vec<String>,
+    /// Mark VAR as hidden.
+    #[arg(long, value_name = "VAR")]
+    blocklist_var: Vec<String>,
     /// Avoid generating layout tests for any type.
     #[arg(long)]
     no_layout_tests: bool,
@@ -157,6 +208,9 @@ struct BindgenCommand {
     /// Generate block signatures instead of void pointers.
     #[arg(long)]
     generate_block: bool,
+    /// Generate string constants as `&CStr` instead of `&[u8]`.
+    #[arg(long)]
+    generate_cstr: bool,
     /// Use extern crate instead of use for block.
     #[arg(long)]
     block_extern_crate: bool,
@@ -166,10 +220,10 @@ struct BindgenCommand {
     /// Output bindings for builtin definitions, e.g. __builtin_va_list.
     #[arg(long)]
     builtins: bool,
-    /// Use the given prefix before raw types instead of ::std::os::raw.
+    /// Use the given PREFIX before raw types instead of ::std::os::raw.
     #[arg(long, value_name = "PREFIX")]
     ctypes_prefix: Option<String>,
-    /// Use the given prefix for anonymous fields.
+    /// Use the given PREFIX for anonymous fields.
     #[arg(long, default_value = DEFAULT_ANON_FIELDS_PREFIX, value_name = "PREFIX")]
     anon_fields_prefix: String,
     /// Time the different bindgen phases and print to stderr
@@ -181,7 +235,7 @@ struct BindgenCommand {
     /// Output our internal IR for debugging purposes.
     #[arg(long)]
     emit_ir: bool,
-    /// Dump graphviz dot file.
+    /// Dump a graphviz dot file to PATH.
     #[arg(long, value_name = "PATH")]
     emit_ir_graphviz: Option<String>,
     /// Enable support for C++ namespaces.
@@ -229,8 +283,8 @@ struct BindgenCommand {
     /// Add a raw line of Rust code at the beginning of output.
     #[arg(long)]
     raw_line: Vec<String>,
-    /// Add a raw line of Rust code to a given module.
-    #[arg(long, number_of_values = 2, value_names = ["MODULE-NAME", "RAW-LINE"])]
+    /// Add a RAW_LINE of Rust code to a given module with name MODULE_NAME.
+    #[arg(long, number_of_values = 2, value_names = ["MODULE_NAME", "RAW_LINE"])]
     module_raw_line: Vec<String>,
     #[arg(long, help = rust_target_help())]
     rust_target: Option<RustTarget>,
@@ -255,6 +309,9 @@ struct BindgenCommand {
     /// Allowlist all contents of PATH.
     #[arg(long, value_name = "PATH")]
     allowlist_file: Vec<String>,
+    /// Allowlist all items matching REGEX. Other non-allowlisted items will not be generated.
+    #[arg(long, value_name = "REGEX")]
+    allowlist_item: Vec<String>,
     /// Print verbose error messages.
     #[arg(long)]
     verbose: bool,
@@ -271,16 +328,16 @@ struct BindgenCommand {
     /// `--formatter=none` instead.
     #[arg(long)]
     no_rustfmt_bindings: bool,
-    /// Which tool should be used to format the bindings
+    /// Which FORMATTER should be used for the bindings
     #[arg(
         long,
         value_name = "FORMATTER",
         conflicts_with = "no_rustfmt_bindings"
     )]
     formatter: Option<Formatter>,
-    /// The absolute path to the rustfmt configuration file. The configuration file will be used for formatting the bindings. This parameter sets `formatter` to `rustfmt`.
-    #[arg(long, value_name = "PATH", conflicts_with = "no_rustfmt_bindings")]
-    rustfmt_configuration_file: Option<String>,
+    /// The absolute PATH to the rustfmt configuration file. The configuration file will be used for formatting the bindings. This parameter sets `formatter` to `rustfmt`.
+    #[arg(long, value_name = "PATH", conflicts_with = "no_rustfmt_bindings", value_parser=parse_rustfmt_config_path)]
+    rustfmt_configuration_file: Option<PathBuf>,
     /// Avoid deriving PartialEq for types matching REGEX.
     #[arg(long, value_name = "REGEX")]
     no_partialeq: Vec<String>,
@@ -305,10 +362,10 @@ struct BindgenCommand {
     /// Use `*const [T; size]` instead of `*const T` for C arrays
     #[arg(long)]
     use_array_pointers_in_arguments: bool,
-    /// The name to be used in a #[link(wasm_import_module = ...)] statement
+    /// The NAME to be used in a #[link(wasm_import_module = ...)] statement
     #[arg(long, value_name = "NAME")]
     wasm_import_module_name: Option<String>,
-    /// Use dynamic loading mode with the given library name.
+    /// Use dynamic loading mode with the given library NAME.
     #[arg(long, value_name = "NAME")]
     dynamic_loading: Option<String>,
     /// Require successful linkage to all functions in the library.
@@ -351,42 +408,54 @@ struct BindgenCommand {
     /// Deduplicates extern blocks.
     #[arg(long)]
     merge_extern_blocks: bool,
-    /// Overrides the ABI of functions matching REGEX. The OVERRIDE value must be of the shape REGEX=ABI where ABI can be one of C, stdcall, efiapi, fastcall, thiscall, aapcs, win64 or C-unwind.
-    #[arg(long, value_name = "OVERRIDE")]
-    override_abi: Vec<String>,
+    /// Overrides the ABI of functions matching REGEX. The OVERRIDE value must be of the shape REGEX=ABI where ABI can be one of C, stdcall, efiapi, fastcall, thiscall, aapcs, win64 or C-unwind<.>
+    #[arg(long, value_name = "OVERRIDE", value_parser = parse_abi_override)]
+    override_abi: Vec<(Abi, String)>,
     /// Wrap unsafe operations in unsafe blocks.
     #[arg(long)]
     wrap_unsafe_ops: bool,
+    /// Enable fallback for clang macro parsing.
+    #[arg(long)]
+    clang_macro_fallback: bool,
+    /// Set path for temporary files generated by fallback for clang macro parsing.
+    #[arg(long)]
+    clang_macro_fallback_build_dir: Option<PathBuf>,
+    /// Use DSTs to represent structures with flexible array members.
+    #[arg(long)]
+    flexarray_dst: bool,
     /// Derive custom traits on any kind of type. The CUSTOM value must be of the shape REGEX=DERIVE where DERIVE is a coma-separated list of derive macros.
-    #[arg(long, value_name = "CUSTOM")]
-    with_derive_custom: Vec<String>,
+    #[arg(long, value_name = "CUSTOM", value_parser = parse_custom_derive)]
+    with_derive_custom: Vec<(Vec<String>, String)>,
     /// Derive custom traits on a `struct`. The CUSTOM value must be of the shape REGEX=DERIVE where DERIVE is a coma-separated list of derive macros.
-    #[arg(long, value_name = "CUSTOM")]
-    with_derive_custom_struct: Vec<String>,
+    #[arg(long, value_name = "CUSTOM", value_parser = parse_custom_derive)]
+    with_derive_custom_struct: Vec<(Vec<String>, String)>,
     /// Derive custom traits on an `enum. The CUSTOM value must be of the shape REGEX=DERIVE where DERIVE is a coma-separated list of derive macros.
-    #[arg(long, value_name = "CUSTOM")]
-    with_derive_custom_enum: Vec<String>,
+    #[arg(long, value_name = "CUSTOM", value_parser = parse_custom_derive)]
+    with_derive_custom_enum: Vec<(Vec<String>, String)>,
     /// Derive custom traits on a `union`. The CUSTOM value must be of the shape REGEX=DERIVE where DERIVE is a coma-separated list of derive macros.
-    #[arg(long, value_name = "CUSTOM")]
-    with_derive_custom_union: Vec<String>,
+    #[arg(long, value_name = "CUSTOM", value_parser = parse_custom_derive)]
+    with_derive_custom_union: Vec<(Vec<String>, String)>,
     /// Generate wrappers for `static` and `static inline` functions.
     #[arg(long, requires = "experimental")]
     wrap_static_fns: bool,
-    /// Sets the path for the source file that must be created due to the presence of `static` and
+    /// Sets the PATH for the source file that must be created due to the presence of `static` and
     /// `static inline` functions.
     #[arg(long, requires = "experimental", value_name = "PATH")]
     wrap_static_fns_path: Option<PathBuf>,
-    /// Sets the suffix added to the extern wrapper functions generated for `static` and `static
+    /// Sets the SUFFIX added to the extern wrapper functions generated for `static` and `static
     /// inline` functions.
     #[arg(long, requires = "experimental", value_name = "SUFFIX")]
     wrap_static_fns_suffix: Option<String>,
-    /// Set the default visibility of fields, including bitfields and accessor methods for
+    /// Set the default VISIBILITY of fields, including bitfields and accessor methods for
     /// bitfields. This flag is ignored if the `--respect-cxx-access-specs` flag is used.
     #[arg(long, value_name = "VISIBILITY")]
     default_visibility: Option<FieldVisibilityKind>,
     /// Whether to emit diagnostics or not.
     #[arg(long, requires = "experimental")]
     emit_diagnostics: bool,
+    /// Generates completions for the specified SHELL, sends them to `stdout` and exits.
+    #[arg(long, value_name = "SHELL")]
+    generate_shell_completions: Option<clap_complete::Shell>,
     /// Enables experimental features.
     #[arg(long)]
     experimental: bool,
@@ -428,6 +497,7 @@ where
         blocklist_function,
         blocklist_item,
         blocklist_file,
+        blocklist_var,
         no_layout_tests,
         no_derive_copy,
         no_derive_debug,
@@ -444,6 +514,7 @@ where
         no_recursive_allowlist,
         objc_extern_crate,
         generate_block,
+        generate_cstr,
         block_extern_crate,
         distrust_clang_mangling,
         builtins,
@@ -477,6 +548,7 @@ where
         allowlist_type,
         allowlist_var,
         allowlist_file,
+        allowlist_item,
         verbose,
         dump_preprocessed_input,
         no_record_matches,
@@ -505,6 +577,9 @@ where
         merge_extern_blocks,
         override_abi,
         wrap_unsafe_ops,
+        clang_macro_fallback,
+        clang_macro_fallback_build_dir,
+        flexarray_dst,
         with_derive_custom,
         with_derive_custom_struct,
         with_derive_custom_enum,
@@ -514,10 +589,22 @@ where
         wrap_static_fns_suffix,
         default_visibility,
         emit_diagnostics,
+        generate_shell_completions,
         experimental: _,
         version,
         clang_args,
     } = command;
+
+    if let Some(shell) = generate_shell_completions {
+        clap_complete::generate(
+            shell,
+            &mut BindgenCommand::command(),
+            "bindgen",
+            &mut std::io::stdout(),
+        );
+
+        exit(0);
+    }
 
     if version {
         println!(
@@ -535,7 +622,7 @@ where
     if let Some(header) = header {
         builder = builder.header(header);
     } else {
-        return Err(Error::new(ErrorKind::Other, "Header not found"));
+        return Err(io::Error::new(io::ErrorKind::Other, "Header not found"));
     }
 
     if let Some(rust_target) = rust_target {
@@ -617,6 +704,10 @@ where
 
     for file in blocklist_file {
         builder = builder.blocklist_file(file);
+    }
+
+    for var in blocklist_var {
+        builder = builder.blocklist_var(var);
     }
 
     if builtins {
@@ -769,6 +860,10 @@ where
         builder = builder.generate_block(true);
     }
 
+    if generate_cstr {
+        builder = builder.generate_cstr(true);
+    }
+
     if block_extern_crate {
         builder = builder.block_extern_crate(true);
     }
@@ -819,6 +914,10 @@ where
         builder = builder.allowlist_file(file);
     }
 
+    for item in allowlist_item {
+        builder = builder.allowlist_item(item);
+    }
+
     for arg in clang_args {
         builder = builder.clang_arg(arg);
     }
@@ -856,23 +955,7 @@ where
         builder = builder.formatter(formatter);
     }
 
-    if let Some(path_str) = rustfmt_configuration_file {
-        let path = PathBuf::from(path_str);
-
-        if !path.is_absolute() {
-            return Err(Error::new(
-                ErrorKind::Other,
-                "--rustfmt-configuration--file needs to be an absolute path!",
-            ));
-        }
-
-        if path.to_str().is_none() {
-            return Err(Error::new(
-                ErrorKind::Other,
-                "--rustfmt-configuration-file contains non-valid UTF8 characters.",
-            ));
-        }
-
+    if let Some(path) = rustfmt_configuration_file {
         builder = builder.rustfmt_configuration_file(Some(path));
     }
 
@@ -974,18 +1057,24 @@ where
         builder = builder.merge_extern_blocks(true);
     }
 
-    for abi_override in override_abi {
-        let (regex, abi_str) = abi_override
-            .rsplit_once('=')
-            .expect("Invalid ABI override: Missing `=`");
-        let abi = abi_str
-            .parse()
-            .unwrap_or_else(|err| panic!("Invalid ABI override: {}", err));
+    for (abi, regex) in override_abi {
         builder = builder.override_abi(abi, regex);
     }
 
     if wrap_unsafe_ops {
         builder = builder.wrap_unsafe_ops(true);
+    }
+
+    if clang_macro_fallback {
+        builder = builder.clang_macro_fallback();
+    }
+
+    if let Some(path) = clang_macro_fallback_build_dir {
+        builder = builder.clang_macro_fallback_build_dir(path);
+    }
+
+    if flexarray_dst {
+        builder = builder.flexarray_dst(true);
     }
 
     #[derive(Debug)]
@@ -1050,12 +1139,7 @@ where
         ),
     ] {
         let name = emit_diagnostics.then_some(name);
-        for custom_derive in custom_derives {
-            let (regex, derives) = custom_derive
-                .rsplit_once('=')
-                .expect("Invalid custom derive argument: Missing `=`");
-            let derives = derives.split(',').map(|s| s.to_owned()).collect();
-
+        for (derives, regex) in custom_derives {
             let mut regex_set = RegexSet::new();
             regex_set.insert(regex);
             regex_set.build_with_diagnostics(false, name);

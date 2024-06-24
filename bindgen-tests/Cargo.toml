@@ -6,17 +6,20 @@ publish = false
 
 [dev-dependencies]
 bindgen = { path = "../bindgen", features = ["__cli", "experimental"] }
-diff = "0.1"
-shlex = "1"
 clap = { version = "4", features = ["derive"] }
+clap_complete = "4"
+shlex = "1"
+prettyplease = { version = "0.2.7", features = ["verbatim"] }
+syn = { version = "2.0" }
 tempfile = "3"
+similar = { version = "2.2.1", features = ["inline"] }
+owo-colors = "3.5.0"
 
 [features]
 logging = ["bindgen/logging"]
 static = ["bindgen/static"]
 runtime = ["bindgen/runtime"]
-which-rustfmt = ["bindgen/which-rustfmt"]
 
-testing_only_extra_assertions = ["bindgen/testing_only_extra_assertions"]
-testing_only_libclang_9 = ["bindgen/testing_only_libclang_9"]
-testing_only_libclang_5 = ["bindgen/testing_only_libclang_5"]
+__testing_only_extra_assertions = ["bindgen/__testing_only_extra_assertions"]
+__testing_only_libclang_9 = ["bindgen/__testing_only_libclang_9"]
+__testing_only_libclang_16 = ["bindgen/__testing_only_libclang_16"]

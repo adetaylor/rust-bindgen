@@ -1,5 +1,7 @@
 //! Compound types (unions and structs) in our intermediate representation.
 
+use itertools::Itertools;
+
 use super::analysis::Sizedness;
 use super::annotations::Annotations;
 use super::context::{BindgenContext, FunctionId, ItemId, TypeId, VarId};
@@ -16,7 +18,6 @@ use crate::ir::derive::CanDeriveCopy;
 use crate::parse::ParseError;
 use crate::HashMap;
 use crate::NonCopyUnionStyle;
-use peeking_take_while::PeekableExt;
 use std::cmp;
 use std::io;
 use std::mem;
@@ -159,7 +160,7 @@ pub(crate) trait FieldMethods {
     /// If this is a bitfield, how many bits does it need?
     fn bitfield_width(&self) -> Option<u32>;
 
-    /// Is this feild declared public?
+    /// Is this field declared public?
     fn is_public(&self) -> bool;
 
     /// Get the annotations for this field.
@@ -837,6 +838,23 @@ impl CompFields {
             }
         }
     }
+
+    /// Return the flex array member for the struct/class, if any.
+    fn flex_array_member(&self, ctx: &BindgenContext) -> Option<TypeId> {
+        let fields = match self {
+            CompFields::Before(_) => panic!("raw fields"),
+            CompFields::After { fields, .. } => fields,
+            CompFields::Error => return None, // panic?
+        };
+
+        match fields.last()? {
+            Field::Bitfields(..) => None,
+            Field::DataMember(FieldData { ty, .. }) => ctx
+                .resolve_type(*ty)
+                .is_incomplete_array(ctx)
+                .map(|item| item.expect_type_id(ctx)),
+        }
+    }
 }
 
 impl Trace for CompFields {
@@ -1137,6 +1155,14 @@ impl CompInfo {
                 panic!("Should always have computed bitfield units first");
             }
         }
+    }
+
+    /// Return the flex array member and its element type if any
+    pub(crate) fn flex_array_member(
+        &self,
+        ctx: &BindgenContext,
+    ) -> Option<TypeId> {
+        self.fields.flex_array_member(ctx)
     }
 
     fn has_fields(&self) -> bool {
@@ -1447,7 +1473,7 @@ impl CompInfo {
                 }
                 CXCursor_TemplateTypeParameter => {
                     let param = Item::type_param(None, cur, ctx).expect(
-                        "Item::type_param should't fail when pointing \
+                        "Item::type_param shouldn't fail when pointing \
                          at a TemplateTypeParameter",
                     );
                     ci.template_params.push(param);
@@ -1663,6 +1689,26 @@ impl CompInfo {
         }
 
         false
+    }
+
+    /// Return true if a compound type is "naturally packed". This means we can exclude the
+    /// "packed" attribute without changing the layout.
+    /// This is useful for types that need an "align(N)" attribute since rustc won't compile
+    /// structs that have both of those attributes.
+    pub(crate) fn already_packed(&self, ctx: &BindgenContext) -> Option<bool> {
+        let mut total_size: usize = 0;
+
+        for field in self.fields().iter() {
+            let layout = field.layout(ctx)?;
+
+            if layout.align != 0 && total_size % layout.align != 0 {
+                return Some(false);
+            }
+
+            total_size += layout.size;
+        }
+
+        Some(true)
     }
 
     /// Returns true if compound type has been forward declared
