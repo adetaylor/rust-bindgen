@@ -1,12 +1,12 @@
 //! Helpers for code generation that don't need macro expansion.
 
-use proc_macro2::{Ident, Span};
+use proc_macro2::{Ident, Span, TokenStream};
 
 use crate::ir::comp::SpecialMemberKind;
 use crate::ir::function::Visibility;
 use crate::ir::context::BindgenContext;
 use crate::ir::layout::Layout;
-use crate::{ir::context::BindgenContext, BindgenOptions};
+use crate::BindgenOptions;
 
 pub(crate) mod attributes {
     use proc_macro2::{Ident, Span, TokenStream};
@@ -256,7 +256,7 @@ impl CppSemanticAttributeSingle {
 
 impl CppSemanticAttributeCreator for CppSemanticAttributeSingle {
     fn do_add(&mut self, ts: TokenStream) {
-        self.attr = ts;
+        self.attr.extend(ts);
     }
 
     fn is_enabled(&self) -> bool {
@@ -367,6 +367,7 @@ pub(crate) mod ast_ty {
         match ik {
             IntKind::Bool => syn::parse_quote! { bool },
             IntKind::Char { .. } => raw_type(ctx, "c_char"),
+            IntKind::Char16 => raw_type(ctx, "c_char16_t"),
             IntKind::SChar => raw_type(ctx, "c_schar"),
             IntKind::UChar => raw_type(ctx, "c_uchar"),
             IntKind::Short => raw_type(ctx, "c_short"),

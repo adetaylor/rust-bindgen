@@ -10,7 +10,7 @@ use crate::callbacks::{ItemInfo, ItemKind};
 use crate::clang::{self, ABIKind, Attribute};
 use crate::parse::{ClangSubItemParser, ParseError, ParseResult};
 use clang_sys::{
-    , CXCallingConv, CX_CXXAccessSpecifier, CX_CXXPrivate, CX_CXXProtected,
+    CXCallingConv, CX_CXXAccessSpecifier, CX_CXXPrivate, CX_CXXProtected,
 };
 
 use quote::TokenStreamExt;

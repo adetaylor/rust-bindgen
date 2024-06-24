@@ -37,7 +37,7 @@ impl fmt::Display for Error {
                     .fmt(f)
             }
             Error::ReferenceButCouldNotRecord => {
-                "Type was a reference in a context where we only expected other types"
+                "Type was a reference in a context where we only expected other types".fmt(f)
             }
             Error::UnsupportedAbi(abi) => {
                  write!(
