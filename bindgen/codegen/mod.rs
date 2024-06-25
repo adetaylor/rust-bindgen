@@ -479,8 +479,11 @@ impl WithImplicitTemplateParams for RustTy {
         ctx: &BindgenContext,
         item: &Item,
     ) -> Self {
-        let (ty, annotations) = self.into_outer_type();
-        RustTy::wraps(ty.with_implicit_template_params(ctx, item), annotations)
+        let (ty, annotation) = self.into_outer_type();
+        Self {
+            ty: ty.with_implicit_template_params(ctx, item),
+            annotation
+        }
     }
 }
 
