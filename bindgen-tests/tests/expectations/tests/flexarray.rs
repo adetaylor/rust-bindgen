@@ -37,6 +37,7 @@ pub struct flexarray<FAM: ?Sized = [::std::os::raw::c_int; 0]> {
     pub count: ::std::os::raw::c_int,
     pub data: FAM,
 }
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of flexarray"][::std::mem::size_of::<flexarray>() - 4usize];
     ["Alignment of flexarray"][::std::mem::align_of::<flexarray>() - 4usize];
@@ -50,7 +51,10 @@ const _: () = {
 impl flexarray<[::std::os::raw::c_int]> {
     pub fn layout(len: usize) -> ::std::alloc::Layout {
         unsafe {
-            let p: *const Self = ::std::ptr::from_raw_parts(::std::ptr::null(), len);
+            let p: *const Self = ::std::ptr::from_raw_parts(
+                ::std::ptr::null::<()>(),
+                len,
+            );
             ::std::alloc::Layout::for_value_raw(p)
         }
     }
@@ -123,6 +127,7 @@ pub struct flexarray_zero<FAM: ?Sized = [::std::os::raw::c_int; 0]> {
     pub count: ::std::os::raw::c_int,
     pub data: FAM,
 }
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of flexarray_zero"][::std::mem::size_of::<flexarray_zero>() - 4usize];
     ["Alignment of flexarray_zero"][::std::mem::align_of::<flexarray_zero>() - 4usize];
@@ -136,7 +141,10 @@ const _: () = {
 impl flexarray_zero<[::std::os::raw::c_int]> {
     pub fn layout(len: usize) -> ::std::alloc::Layout {
         unsafe {
-            let p: *const Self = ::std::ptr::from_raw_parts(::std::ptr::null(), len);
+            let p: *const Self = ::std::ptr::from_raw_parts(
+                ::std::ptr::null::<()>(),
+                len,
+            );
             ::std::alloc::Layout::for_value_raw(p)
         }
     }
@@ -220,7 +228,10 @@ pub struct flexarray_template<T, FAM: ?Sized = [T; 0]> {
 impl<T> flexarray_template<T, [T]> {
     pub fn layout(len: usize) -> ::std::alloc::Layout {
         unsafe {
-            let p: *const Self = ::std::ptr::from_raw_parts(::std::ptr::null(), len);
+            let p: *const Self = ::std::ptr::from_raw_parts(
+                ::std::ptr::null::<()>(),
+                len,
+            );
             ::std::alloc::Layout::for_value_raw(p)
         }
     }
@@ -301,6 +312,7 @@ impl<T> Default for flexarray_template<T, [T; 0]> {
 pub struct flexarray_ref {
     pub things: *mut flexarray,
 }
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of flexarray_ref"][::std::mem::size_of::<flexarray_ref>() - 8usize];
     ["Alignment of flexarray_ref"][::std::mem::align_of::<flexarray_ref>() - 8usize];
@@ -324,6 +336,7 @@ pub struct flexarray_bogus_zero_fam<FAM: ?Sized = [::std::os::raw::c_char; 0]> {
     pub data1: __IncompleteArrayField<::std::os::raw::c_int>,
     pub data2: FAM,
 }
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     [
         "Size of flexarray_bogus_zero_fam",
@@ -344,7 +357,10 @@ const _: () = {
 impl flexarray_bogus_zero_fam<[::std::os::raw::c_char]> {
     pub fn layout(len: usize) -> ::std::alloc::Layout {
         unsafe {
-            let p: *const Self = ::std::ptr::from_raw_parts(::std::ptr::null(), len);
+            let p: *const Self = ::std::ptr::from_raw_parts(
+                ::std::ptr::null::<()>(),
+                len,
+            );
             ::std::alloc::Layout::for_value_raw(p)
         }
     }
@@ -435,6 +451,7 @@ pub struct flexarray_align<FAM: ?Sized = [::std::os::raw::c_int; 0]> {
     pub count: ::std::os::raw::c_int,
     pub data: FAM,
 }
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of flexarray_align"][::std::mem::size_of::<flexarray_align>() - 128usize];
     [
@@ -450,7 +467,10 @@ const _: () = {
 impl flexarray_align<[::std::os::raw::c_int]> {
     pub fn layout(len: usize) -> ::std::alloc::Layout {
         unsafe {
-            let p: *const Self = ::std::ptr::from_raw_parts(::std::ptr::null(), len);
+            let p: *const Self = ::std::ptr::from_raw_parts(
+                ::std::ptr::null::<()>(),
+                len,
+            );
             ::std::alloc::Layout::for_value_raw(p)
         }
     }

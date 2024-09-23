@@ -35,20 +35,20 @@ use helpers::ignore;
 /// a block of code with the following items:
 ///
 /// - `default`: The default value for the field. If this item is omitted, `Default::default()` is
-/// used instead, meaning that the type of the field must implement `Default`.
+///   used instead, meaning that the type of the field must implement `Default`.
 /// - `methods`: A block of code containing methods for the `Builder` type. These methods should be
-/// related to the field being declared.
+///   related to the field being declared.
 /// - `as_args`: This item declares how the field should be converted into a valid CLI argument for
-/// `bindgen` and is used in the [`Builder::command_line_flags`] method which is used to do a
-/// roundtrip test of the CLI args in the `bindgen-test` crate. This item can take one of the
-/// following:
+///   `bindgen` and is used in the [`Builder::command_line_flags`] method which is used to do a
+///   roundtrip test of the CLI args in the `bindgen-test` crate. This item can take one of the
+///   following:
 ///   - A string literal with the flag if the type of the field implements the [`AsArgs`] trait.
 ///   - A closure with the signature `|field, args: &mut Vec<String>| -> ()` that pushes arguments
-///   into the `args` buffer based on the value of the field. This is used if the field does not
-///   implement `AsArgs` or if the implementation of the trait is not logically correct for the
-///   option and a custom behavior must be taken into account.
+///     into the `args` buffer based on the value of the field. This is used if the field does not
+///     implement `AsArgs` or if the implementation of the trait is not logically correct for the
+///     option and a custom behavior must be taken into account.
 ///   - The `ignore` literal, which does not emit any CLI arguments for this field. This is useful
-///   if the field cannot be used from the `bindgen` CLI.
+///     if the field cannot be used from the `bindgen` CLI.
 ///
 /// As an example, this would be the declaration of a `bool` field called `be_fun` whose default
 /// value is `false` (the `Default` value for `bool`):
@@ -1474,10 +1474,8 @@ options! {
             /// Note that they will usually not work. However you can use `-fkeep-inline-functions`
             /// or `-fno-inline-functions` if you are responsible of compiling the library to make
             /// them callable.
-            #[cfg_attr(
-                feature = "experimental",
-                doc = "\nCheck the [`Builder::wrap_static_fns`] method for an alternative."
-            )]
+            ///
+            /// Check the [`Builder::wrap_static_fns`] method for an alternative.
             pub fn generate_inline_functions(mut self, doit: bool) -> Self {
                 self.options.generate_inline_functions = doit;
                 self
@@ -2076,7 +2074,6 @@ options! {
     /// Whether to generate wrappers for `static` functions.
     wrap_static_fns: bool {
         methods: {
-            #[cfg(feature = "experimental")]
             /// Set whether to generate wrappers for `static`` functions.
             ///
             /// Passing `true` to this method will generate a C source file with non-`static`
@@ -2095,7 +2092,6 @@ options! {
     /// The suffix to be added to the function wrappers for `static` functions.
     wrap_static_fns_suffix: Option<String> {
         methods: {
-            #[cfg(feature = "experimental")]
             /// Set the suffix added to the wrappers for `static` functions.
             ///
             /// This option only comes into effect if `true` is passed to the
@@ -2112,7 +2108,6 @@ options! {
     /// The path of the file where the wrappers for `static` functions will be emitted.
     wrap_static_fns_path: Option<PathBuf> {
         methods: {
-            #[cfg(feature = "experimental")]
             /// Set the path for the source code file that would be created if any wrapper
             /// functions must be generated due to the presence of `static` functions.
             ///

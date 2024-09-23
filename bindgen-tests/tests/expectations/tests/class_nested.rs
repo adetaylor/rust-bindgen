@@ -10,6 +10,7 @@ pub struct A {
 pub struct A_B {
     pub member_b: ::std::os::raw::c_int,
 }
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of A_B"][::std::mem::size_of::<A_B>() - 4usize];
     ["Alignment of A_B"][::std::mem::align_of::<A_B>() - 4usize];
@@ -31,6 +32,7 @@ impl<T> Default for A_D<T> {
         }
     }
 }
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of A"][::std::mem::size_of::<A>() - 4usize];
     ["Alignment of A"][::std::mem::align_of::<A>() - 4usize];
@@ -42,6 +44,7 @@ const _: () = {
 pub struct A_C {
     pub baz: ::std::os::raw::c_int,
 }
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of A_C"][::std::mem::size_of::<A_C>() - 4usize];
     ["Alignment of A_C"][::std::mem::align_of::<A_C>() - 4usize];
@@ -50,6 +53,7 @@ const _: () = {
 extern "C" {
     pub static mut var: A_B;
 }
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     [
         "Size of template specialization: A_D_open0_int_close0",
@@ -66,6 +70,7 @@ extern "C" {
 pub struct D {
     pub member: A_B,
 }
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of D"][::std::mem::size_of::<D>() - 4usize];
     ["Alignment of D"][::std::mem::align_of::<D>() - 4usize];

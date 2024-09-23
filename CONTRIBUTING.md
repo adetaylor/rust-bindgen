@@ -37,7 +37,9 @@ and introduce yourself.
   - [Updating the changelog](#updating-the-changelog)
   - [Merge to `main`](#merge-to-main)
   - [Tag and publish](#tag-and-publish)
-  - [Create a new release on GitHub](create-a-new-relese-on-github)
+  - [Create a new release on Github](#create-a-new-release-on-github)
+  - [What to do if a Github release fails](#what-to-do-if-a-github-release-fails)
+  - [Create a new crates.io release](#create-a-new-cratesio-release)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -423,7 +425,7 @@ $ brew install creduce
 $ # Etc...
 ```
 
-Otherwise, follow [these instructions](https://github.com/csmith-project/creduce/blob/main/INSTALL.md) for building and/or installing `creduce`.
+Otherwise, follow [these instructions](https://github.com/csmith-project/creduce/blob/master/INSTALL.md) for building and/or installing `creduce`.
 
 Running `creduce` requires two things:
 
@@ -488,10 +490,11 @@ to fail to compile `bindgen`'s emitted bindings, you can invoke `predicate.py`
 like this:
 
 ```bash
+# the rustc-grep argument expects a regex, thus escape where necessary
 path/to/rust-bindgen/csmith-fuzzing/predicate.py \
     --bindings-grep NameOfTheStructThatIsErroneouslyDerivingEq \
     --expect-compile-fail \
-    --rustc-grep 'error[E0277]: the trait bound `f64: std::cmp::Eq` is not satisfied' \
+    --rustc-grep 'error\[E0277\]: the trait bound `f64: std::cmp::Eq` is not satisfied' \
     ./isolated-test-case.h
 ```
 

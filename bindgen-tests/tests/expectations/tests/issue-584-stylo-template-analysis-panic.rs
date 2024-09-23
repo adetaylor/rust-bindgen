@@ -7,6 +7,7 @@ pub struct A {
 }
 #[bindgen_original_name("A::a")]
 pub type A_a = b;
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of A"][::std::mem::size_of::<A>() - 1usize];
     ["Alignment of A"][::std::mem::align_of::<A>() - 1usize];
@@ -34,6 +35,7 @@ pub struct f {
 pub struct g {
     pub h: f,
 }
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of g"][::std::mem::size_of::<g>() - 1usize];
     ["Alignment of g"][::std::mem::align_of::<g>() - 1usize];
@@ -52,6 +54,7 @@ impl Default for g {
 pub struct b {
     pub _base: g,
 }
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of b"][::std::mem::size_of::<b>() - 1usize];
     ["Alignment of b"][::std::mem::align_of::<b>() - 1usize];
@@ -69,6 +72,7 @@ extern "C" {
     #[link_name = "\u{1}_Z25Servo_Element_GetSnapshotv"]
     pub fn Servo_Element_GetSnapshot() -> A;
 }
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     [
         "Size of template specialization: f_open0_e_open1_int_close1_close0",

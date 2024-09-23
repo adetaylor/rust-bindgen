@@ -16,34 +16,26 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install stable
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@master
         with:
-          profile: minimal
           # TODO: Should ideally be stable, but we use some nightly-only
           # features.
           toolchain: nightly
-          override: true
           components: rustfmt, clippy
 
       - name: Run rustfmt
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: -- --check
+        run: cargo fmt -- --check
 
       - name: Run clippy
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: --tests
+        run: cargo clippy --tests
 
   msrv:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install msrv for lib
         uses: dtolnay/rust-toolchain@master
@@ -70,14 +62,12 @@ jobs:
     env:
       RUSTFLAGS: -D warnings
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install stable
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@master
         with:
-          profile: minimal
           toolchain: stable
-          override: true
 
       - name: Check without default features 
         run: cargo check -p bindgen --no-default-features --features=runtime 
@@ -87,14 +77,12 @@ jobs:
     env:
       RUSTDOCFLAGS: -D warnings
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install stable
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@master
         with:
-          profile: minimal
           toolchain: stable
-          override: true
 
       - name: Generate documentation for `bindgen` 
         run: cargo doc --document-private-items --no-deps -p bindgen 
@@ -105,14 +93,12 @@ jobs:
   quickchecking:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install stable
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@master
         with:
-          profile: minimal
           toolchain: stable
-          override: true
 
       # TODO: Actually run quickchecks once `bindgen` is reliable enough.
       - name: Build quickcheck tests
@@ -124,14 +110,12 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-12]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install stable
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@master
         with:
-          profile: minimal
           toolchain: stable
-          override: true
 
       - name: Test expectations
         run: cd bindgen-tests/tests/expectations && cargo test
@@ -187,7 +171,7 @@ jobs:
             no_default_features: 0
             feature_extra_asserts: 0
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install multiarch packages
         if: matrix.target.debian
@@ -205,12 +189,10 @@ jobs:
           sudo apt-get install libc6:${{matrix.target.debian}} libstdc++6:${{matrix.target.debian}}
 
       - name: Install stable
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@master
         with:
-          profile: minimal
           toolchain: stable
           target: ${{matrix.target.rust}}
-          override: true
       - name: Install libtinfo
         if: matrix.os == 'ubuntu-latest'
         run: |
@@ -227,6 +209,7 @@ jobs:
           BINDGEN_FEATURE_RUNTIME: ${{matrix.feature_runtime}}
           BINDGEN_FEATURE_EXTRA_ASSERTS: ${{matrix.feature_extra_asserts}}
           BINDGEN_NO_DEFAULT_FEATURES: ${{matrix.no_default_features}}
+          BINDGEN_RUST_FOR_LINUX_TEST: ${{matrix.os == 'ubuntu-latest' && matrix.llvm_version == '16.0' && matrix.feature_extra_asserts == 0 && 1 || 0}}
         run: ./ci/test.sh
 
   check-cfg:
@@ -234,14 +217,12 @@ jobs:
     env:
       RUSTFLAGS: -D warnings
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       
       - name: Install nightly
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@master
         with:
-          profile: minimal
           toolchain: nightly
-          override: true
       
       - name: Check cfg
         run: cargo check -Z unstable-options -Z check-cfg
@@ -249,7 +230,7 @@ jobs:
   test-book:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       # NOTE(emilio): Change deploy-book as well if you change this.
       - name: Test book

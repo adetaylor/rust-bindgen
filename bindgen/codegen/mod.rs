@@ -20,7 +20,9 @@ use self::struct_layout::StructLayoutTracker;
 
 use super::BindgenOptions;
 
-use crate::callbacks::{DeriveInfo, FieldInfo, TypeKind as DeriveTypeKind};
+use crate::callbacks::{
+    AttributeInfo, DeriveInfo, FieldInfo, TypeKind as DeriveTypeKind,
+};
 use crate::codegen::error::Error;
 use crate::codegen::helpers::{
     CppSemanticAttributeAdder, CppSemanticAttributeCreator,
@@ -1096,6 +1098,19 @@ impl CodeGenerator for Type {
                             .extend(custom_derives.iter().map(|s| s.as_str()));
                         attributes.push(attributes::derives(&derives));
 
+                        let custom_attributes =
+                            ctx.options().all_callbacks(|cb| {
+                                cb.add_attributes(&AttributeInfo {
+                                    name: &name,
+                                    kind: DeriveTypeKind::Struct,
+                                })
+                            });
+                        attributes.extend(
+                            custom_attributes
+                                .iter()
+                                .map(|s| s.parse().unwrap()),
+                        );
+
                         quote! {
                             #( #attributes )*
                             pub struct #rust_name
@@ -1363,6 +1378,7 @@ impl CodeGenerator for TemplateInstantiation {
                 // #size_of_expr < #size, the subtraction will overflow, both
                 // of which print enough information to see what has gone wrong.
                 result.push(quote! {
+                    #[allow(clippy::unnecessary_operation, clippy::identity_op)]
                     const _: () = {
                         [#size_of_err][#size_of_expr - #size];
                         [#align_of_err][#align_of_expr - #align];
@@ -1724,13 +1740,13 @@ fn access_specifier(
 
 /// Compute a fields or structs visibility based on multiple conditions.
 /// 1. If the element was declared public, and we respect such CXX accesses specs
-/// (context option) => By default Public, but this can be overruled by an `annotation`.
+///    (context option) => By default Public, but this can be overruled by an `annotation`.
 ///
 /// 2. If the element was declared private, and we respect such CXX accesses specs
-/// (context option) => By default Private, but this can be overruled by an `annotation`.
+///    (context option) => By default Private, but this can be overruled by an `annotation`.
 ///
 /// 3. If we do not respect visibility modifiers, the result depends on the `annotation`,
-/// if any, or the passed `default_kind`.
+///    if any, or the passed `default_kind`.
 ///
 fn compute_visibility(
     ctx: &BindgenContext,
@@ -2469,6 +2485,25 @@ impl CodeGenerator for CompInfo {
             }
         }
 
+        attributes.extend(
+            item.annotations()
+                .attributes()
+                .iter()
+                .map(|s| s.parse().unwrap()),
+        );
+
+        let custom_attributes = ctx.options().all_callbacks(|cb| {
+            cb.add_attributes(&AttributeInfo {
+                name: &canonical_name,
+                kind: if is_rust_union {
+                    DeriveTypeKind::Union
+                } else {
+                    DeriveTypeKind::Struct
+                },
+            })
+        });
+        attributes.extend(custom_attributes.iter().map(|s| s.parse().unwrap()));
+
         if item.must_use(ctx) {
             attributes.push(attributes::must_use());
         }
@@ -2615,6 +2650,7 @@ impl CodeGenerator for CompInfo {
 
                     if compile_time {
                         result.push(quote! {
+                            #[allow(clippy::unnecessary_operation, clippy::identity_op)]
                             const _: () = {
                                 [#size_of_err][#size_of_expr - #size];
                                 #check_struct_align
@@ -2815,7 +2851,7 @@ impl CompInfo {
                 pub fn layout(len: usize) -> ::#prefix::alloc::Layout {
                     // SAFETY: Null pointers are OK if we don't deref them
                     unsafe {
-                        let p: *const Self = ::#prefix::ptr::from_raw_parts(::#prefix::ptr::null(), len);
+                        let p: *const Self = ::#prefix::ptr::from_raw_parts(::#prefix::ptr::null::<()>(), len);
                         ::#prefix::alloc::Layout::for_value_raw(p)
                     }
                 }
@@ -3672,6 +3708,23 @@ impl CodeGenerator for Enum {
             });
             // In most cases this will be a no-op, since custom_derives will be empty.
             derives.extend(custom_derives.iter().map(|s| s.as_str()));
+
+            attrs.extend(
+                item.annotations()
+                    .attributes()
+                    .iter()
+                    .map(|s| s.parse().unwrap()),
+            );
+
+            // The custom attribute callback may return a list of attributes;
+            // add them to the end of the list.
+            let custom_attributes = ctx.options().all_callbacks(|cb| {
+                cb.add_attributes(&AttributeInfo {
+                    name: &name,
+                    kind: DeriveTypeKind::Enum,
+                })
+            });
+            attrs.extend(custom_attributes.iter().map(|s| s.parse().unwrap()));
 
             attrs.push(attributes::derives(&derives));
         }
@@ -4878,11 +4931,11 @@ fn unsupported_abi_diagnostic(
                 fn_name,
                 error
             ),
-            Level::Warn,
+            Level::Warning,
         )
         .add_annotation(
             "No code will be generated for this function.",
-            Level::Warn,
+            Level::Warning,
         )
         .add_annotation(
             format!(
@@ -4926,7 +4979,7 @@ fn variadic_fn_diagnostic(
 
         let mut diag = Diagnostic::default();
 
-        diag.with_title(format!("Cannot generate wrapper for the static function `{}`.", fn_name), Level::Warn)
+        diag.with_title(format!("Cannot generate wrapper for the static function `{}`.", fn_name), Level::Warning)
             .add_annotation("The `--wrap-static-fns` feature does not support variadic functions.", Level::Note)
             .add_annotation("No code will be generated for this function.", Level::Note);
 

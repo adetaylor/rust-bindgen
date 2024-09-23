@@ -320,7 +320,8 @@ impl ClangSubItemParser for Var {
                             matches!(ty.kind(), CXType_Auto | CXType_Unexposed),
                             "Couldn't resolve constant type, and it \
                              wasn't an nondeductible auto type or unexposed \
-                             type!"
+                             type: {:?}",
+                            ty
                         );
                         return Err(e);
                     }
@@ -489,7 +490,7 @@ fn duplicated_macro_diagnostic(
     #[cfg(feature = "experimental")]
     // FIXME (pvdrz & amanjeev): This diagnostic message shows way too often to be actually
     // useful. We have to change the logic where this function is called to be able to emit this
-    // message only when the duplication is an actuall issue.
+    // message only when the duplication is an actual issue.
     //
     // If I understood correctly, `bindgen` ignores all `#undef` directives. Meaning that this:
     // ```c
@@ -518,7 +519,7 @@ fn duplicated_macro_diagnostic(
         slice.with_source(source);
 
         Diagnostic::default()
-            .with_title("Duplicated macro definition.", Level::Warn)
+            .with_title("Duplicated macro definition.", Level::Warning)
             .add_slice(slice)
             .add_annotation("This macro had a duplicate.", Level::Note)
             .display();

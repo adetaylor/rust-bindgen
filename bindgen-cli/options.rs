@@ -7,10 +7,12 @@ use bindgen::{
 };
 use clap::error::{Error, ErrorKind};
 use clap::{CommandFactory, Parser};
+use proc_macro2::TokenStream;
 use std::fs::File;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::exit;
+use std::str::FromStr;
 
 fn rust_target_help() -> String {
     format!(
@@ -88,6 +90,43 @@ fn parse_custom_derive(
     Ok((derives, regex.to_owned()))
 }
 
+fn parse_custom_attribute(
+    custom_attribute: &str,
+) -> Result<(Vec<String>, String), Error> {
+    let mut brace_level = 0;
+    let (regex, attributes) = custom_attribute
+        .rsplit_once(|c| {
+            match c {
+                ']' => brace_level += 1,
+                '[' => brace_level -= 1,
+                _ => {}
+            }
+            c == '=' && brace_level == 0
+        })
+        .ok_or_else(|| Error::raw(ErrorKind::InvalidValue, "Missing `=`"))?;
+
+    let mut brace_level = 0;
+    let attributes = attributes
+        .split(|c| {
+            match c {
+                ']' => brace_level += 1,
+                '[' => brace_level -= 1,
+                _ => {}
+            }
+            c == ',' && brace_level == 0
+        })
+        .map(|s| s.to_owned())
+        .collect::<Vec<_>>();
+
+    for attribute in &attributes {
+        if let Err(err) = TokenStream::from_str(attribute) {
+            return Err(Error::raw(ErrorKind::InvalidValue, err));
+        }
+    }
+
+    Ok((attributes, regex.to_owned()))
+}
+
 #[derive(Parser, Debug)]
 #[clap(
     about = "Generates Rust bindings from C/C++ headers.",
@@ -115,6 +154,9 @@ struct BindgenCommand {
     /// Mark any enum whose name matches REGEX as a Rust enum.
     #[arg(long, value_name = "REGEX")]
     rustified_enum: Vec<String>,
+    /// Mark any enum whose name matches REGEX as a non-exhaustive Rust enum.
+    #[arg(long, value_name = "REGEX")]
+    rustified_non_exhaustive_enum: Vec<String>,
     /// Mark any enum whose name matches REGEX as a series of constants.
     #[arg(long, value_name = "REGEX")]
     constified_enum: Vec<String>,
@@ -374,7 +416,7 @@ struct BindgenCommand {
     /// Prefix the name of exported symbols.
     #[arg(long)]
     prefix_link_name: Option<String>,
-    /// Makes generated bindings `pub` only for items if the items are publically accessible in C++.
+    /// Makes generated bindings `pub` only for items if the items are publicly accessible in C++.
     #[arg(long)]
     respect_cxx_access_specs: bool,
     /// Always translate enum integer types to native Rust integer types.
@@ -435,16 +477,28 @@ struct BindgenCommand {
     /// Derive custom traits on a `union`. The CUSTOM value must be of the shape REGEX=DERIVE where DERIVE is a coma-separated list of derive macros.
     #[arg(long, value_name = "CUSTOM", value_parser = parse_custom_derive)]
     with_derive_custom_union: Vec<(Vec<String>, String)>,
+    /// Add custom attributes on any kind of type. The CUSTOM value must be of the shape REGEX=ATTRIBUTE where ATTRIBUTE is a coma-separated list of attributes.
+    #[arg(long, value_name = "CUSTOM", value_parser = parse_custom_attribute)]
+    with_attribute_custom: Vec<(Vec<String>, String)>,
+    /// Add custom attributes on a `struct`. The CUSTOM value must be of the shape REGEX=ATTRIBUTE where ATTRIBUTE is a coma-separated list of attributes.
+    #[arg(long, value_name = "CUSTOM", value_parser = parse_custom_attribute)]
+    with_attribute_custom_struct: Vec<(Vec<String>, String)>,
+    /// Add custom attributes on an `enum. The CUSTOM value must be of the shape REGEX=ATTRIBUTE where ATTRIBUTE is a coma-separated list of attributes.
+    #[arg(long, value_name = "CUSTOM", value_parser = parse_custom_attribute)]
+    with_attribute_custom_enum: Vec<(Vec<String>, String)>,
+    /// Add custom attributes on a `union`. The CUSTOM value must be of the shape REGEX=ATTRIBUTE where ATTRIBUTE is a coma-separated list of attributes.
+    #[arg(long, value_name = "CUSTOM", value_parser = parse_custom_attribute)]
+    with_attribute_custom_union: Vec<(Vec<String>, String)>,
     /// Generate wrappers for `static` and `static inline` functions.
-    #[arg(long, requires = "experimental")]
+    #[arg(long)]
     wrap_static_fns: bool,
     /// Sets the PATH for the source file that must be created due to the presence of `static` and
     /// `static inline` functions.
-    #[arg(long, requires = "experimental", value_name = "PATH")]
+    #[arg(long, value_name = "PATH")]
     wrap_static_fns_path: Option<PathBuf>,
     /// Sets the SUFFIX added to the extern wrapper functions generated for `static` and `static
     /// inline` functions.
-    #[arg(long, requires = "experimental", value_name = "SUFFIX")]
+    #[arg(long, value_name = "SUFFIX")]
     wrap_static_fns_suffix: Option<String>,
     /// Set the default VISIBILITY of fields, including bitfields and accessor methods for
     /// bitfields. This flag is ignored if the `--respect-cxx-access-specs` flag is used.
@@ -483,6 +537,7 @@ where
         newtype_enum,
         newtype_global_enum,
         rustified_enum,
+        rustified_non_exhaustive_enum,
         constified_enum,
         constified_enum_module,
         default_macro_constant_type,
@@ -584,6 +639,10 @@ where
         with_derive_custom_struct,
         with_derive_custom_enum,
         with_derive_custom_union,
+        with_attribute_custom,
+        with_attribute_custom_struct,
+        with_attribute_custom_enum,
+        with_attribute_custom_union,
         wrap_static_fns,
         wrap_static_fns_path,
         wrap_static_fns_suffix,
@@ -647,6 +706,10 @@ where
 
     for regex in rustified_enum {
         builder = builder.rustified_enum(regex);
+    }
+
+    for regex in rustified_non_exhaustive_enum {
+        builder = builder.rustified_non_exhaustive_enum(regex);
     }
 
     for regex in constified_enum {
@@ -1149,6 +1212,82 @@ where
                 kind,
                 regex_set,
             }));
+        }
+    }
+
+    #[derive(Debug)]
+    struct CustomAttributeCallback {
+        attributes: Vec<String>,
+        kind: Option<TypeKind>,
+        regex_set: bindgen::RegexSet,
+    }
+
+    impl bindgen::callbacks::ParseCallbacks for CustomAttributeCallback {
+        fn cli_args(&self) -> Vec<String> {
+            let mut args = vec![];
+
+            let flag = match &self.kind {
+                None => "--with-attribute-custom",
+                Some(TypeKind::Struct) => "--with-attribute-custom-struct",
+                Some(TypeKind::Enum) => "--with-attribute-custom-enum",
+                Some(TypeKind::Union) => "--with-attribute-custom-union",
+            };
+
+            let attributes = self.attributes.join(",");
+
+            for item in self.regex_set.get_items() {
+                args.extend_from_slice(&[
+                    flag.to_owned(),
+                    format!("{}={}", item, attributes),
+                ]);
+            }
+
+            args
+        }
+
+        fn add_attributes(
+            &self,
+            info: &bindgen::callbacks::AttributeInfo<'_>,
+        ) -> Vec<String> {
+            if self.kind.map(|kind| kind == info.kind).unwrap_or(true) &&
+                self.regex_set.matches(info.name)
+            {
+                return self.attributes.clone();
+            }
+            vec![]
+        }
+    }
+
+    for (custom_attributes, kind, name) in [
+        (with_attribute_custom, None, "--with-attribute-custom"),
+        (
+            with_attribute_custom_struct,
+            Some(TypeKind::Struct),
+            "--with-attribute-custom-struct",
+        ),
+        (
+            with_attribute_custom_enum,
+            Some(TypeKind::Enum),
+            "--with-attribute-custom-enum",
+        ),
+        (
+            with_attribute_custom_union,
+            Some(TypeKind::Union),
+            "--with-attribute-custom-union",
+        ),
+    ] {
+        let name = emit_diagnostics.then_some(name);
+        for (attributes, regex) in custom_attributes {
+            let mut regex_set = RegexSet::new();
+            regex_set.insert(regex);
+            regex_set.build_with_diagnostics(false, name);
+
+            builder =
+                builder.parse_callbacks(Box::new(CustomAttributeCallback {
+                    attributes,
+                    kind,
+                    regex_set,
+                }));
         }
     }
 

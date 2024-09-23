@@ -13,6 +13,7 @@ pub struct C {
 pub type C_MyInt = ::std::os::raw::c_int;
 #[bindgen_original_name("C::Lookup")]
 pub type C_Lookup = *const ::std::os::raw::c_char;
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of C"][::std::mem::size_of::<C>() - 72usize];
     ["Alignment of C"][::std::mem::align_of::<C>() - 8usize];
@@ -79,6 +80,7 @@ pub struct D {
     pub _base: C,
     pub ptr: *mut C_MyInt,
 }
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of D"][::std::mem::size_of::<D>() - 80usize];
     ["Alignment of D"][::std::mem::align_of::<D>() - 8usize];

@@ -15,7 +15,7 @@ readme = "../README.md"
 repository = "https://github.com/adetaylor/rust-bindgen"
 documentation = "https://docs.rs/bindgen"
 homepage = "https://rust-lang.github.io/rust-bindgen/"
-version = "0.69.5"
+version = "0.70.1"
 edition = "2018"
 build = "build.rs"
 # If you change this, also update README.md and msrv in .github/workflows/bindgen.yml
@@ -26,10 +26,10 @@ name = "autocxx_bindgen"
 path = "lib.rs"
 
 [dependencies]
-annotate-snippets = { version = "0.9.1", features = ["color"], optional = true }
+annotate-snippets = { version = "0.11.4", optional = true }
 bitflags = "2.2.1"
 cexpr = "0.6"
-clang-sys = { version = "1", features = ["clang_6_0"] }
+clang-sys = { version = "1", features = ["clang_11_0"] }
 itertools = { version = ">=0.10,<0.14", default-features = false }
 log = { version = "0.4", optional = true }
 prettyplease = { version = "0.2.7", optional = true, features = ["verbatim"] }

@@ -17,6 +17,7 @@ pub mod root {
         pub struct Bar_Baz {
             pub foo: ::std::os::raw::c_int,
         }
+        #[allow(clippy::unnecessary_operation, clippy::identity_op)]
         const _: () = {
             ["Size of Bar_Baz"][::std::mem::size_of::<Bar_Baz>() - 4usize];
             ["Alignment of Bar_Baz"][::std::mem::align_of::<Bar_Baz>() - 4usize];
@@ -24,6 +25,7 @@ pub mod root {
                 "Offset of field: Bar_Baz::foo",
             ][::std::mem::offset_of!(Bar_Baz, foo) - 0usize];
         };
+        #[allow(clippy::unnecessary_operation, clippy::identity_op)]
         const _: () = {
             ["Size of Bar"][::std::mem::size_of::<Bar>() - 4usize];
             ["Alignment of Bar"][::std::mem::align_of::<Bar>() - 4usize];
@@ -34,6 +36,7 @@ pub mod root {
         pub struct Baz {
             pub baz: ::std::os::raw::c_int,
         }
+        #[allow(clippy::unnecessary_operation, clippy::identity_op)]
         const _: () = {
             ["Size of Baz"][::std::mem::size_of::<Baz>() - 4usize];
             ["Alignment of Baz"][::std::mem::align_of::<Baz>() - 4usize];

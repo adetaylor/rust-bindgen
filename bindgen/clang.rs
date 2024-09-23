@@ -876,7 +876,7 @@ impl Cursor {
         unsafe { clang_getCXXAccessSpecifier(self.x) }
     }
 
-    /// Is the cursor's referent publically accessible in C++?
+    /// Is the cursor's referent publicly accessible in C++?
     ///
     /// Returns true if self.access_specifier() is `CX_CXXPublic` or
     /// `CX_CXXInvalidAccessSpecifier`.
@@ -1504,6 +1504,15 @@ impl Type {
         unsafe {
             Type {
                 x: clang_Type_getNamedType(self.x),
+            }
+        }
+    }
+
+    /// For atomic types, get the underlying type.
+    pub(crate) fn atomic_value_type(&self) -> Type {
+        unsafe {
+            Type {
+                x: clang_Type_getValueType(self.x),
             }
         }
     }
