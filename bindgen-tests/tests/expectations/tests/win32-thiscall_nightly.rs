@@ -11,12 +11,12 @@ const _: () = {
     ["Size of Foo"][::std::mem::size_of::<Foo>() - 1usize];
     ["Alignment of Foo"][::std::mem::align_of::<Foo>() - 1usize];
 };
-extern "thiscall" {
+unsafe extern "thiscall" {
     #[bindgen_original_name("test")]
     #[link_name = "\u{1}?test@Foo@@QAEXXZ"]
     pub fn Foo_test(this: *mut Foo);
 }
-extern "thiscall" {
+unsafe extern "thiscall" {
     #[bindgen_original_name("test2")]
     #[link_name = "\u{1}?test2@Foo@@QAEHH@Z"]
     pub fn Foo_test2(

@@ -249,7 +249,7 @@ impl Type {
             return Cow::Borrowed(name);
         }
 
-        let name = name.replace(|c| c == ' ' || c == ':' || c == '.', "_");
+        let name = name.replace([' ', ':', '.'], "_");
         Cow::Owned(name)
     }
 
@@ -264,7 +264,7 @@ impl Type {
                 Some((inner, Cow::Borrowed("ref")))
             }
             TypeKind::Array(inner, length) => {
-                Some((inner, format!("array{}", length).into()))
+                Some((inner, format!("array{length}").into()))
             }
             _ => None,
         };
@@ -272,13 +272,13 @@ impl Type {
             ctx.resolve_item(inner)
                 .expect_type()
                 .sanitized_name(ctx)
-                .map(|name| format!("{}_{}", prefix, name).into())
+                .map(|name| format!("{prefix}_{name}").into())
         } else {
             self.name().map(Self::sanitize_name)
         }
     }
 
-    /// See safe_canonical_type.
+    /// See [`Self::safe_canonical_type`].
     pub(crate) fn canonical_type<'tr>(
         &'tr self,
         ctx: &'tr BindgenContext,
@@ -474,7 +474,7 @@ impl TypeKind {
 #[test]
 fn is_invalid_type_param_valid() {
     let ty = Type::new(Some("foo".into()), None, TypeKind::TypeParam, false);
-    assert!(!ty.is_invalid_type_param())
+    assert!(!ty.is_invalid_type_param());
 }
 
 #[test]
@@ -485,38 +485,38 @@ fn is_invalid_type_param_valid_underscore_and_numbers() {
         TypeKind::TypeParam,
         false,
     );
-    assert!(!ty.is_invalid_type_param())
+    assert!(!ty.is_invalid_type_param());
 }
 
 #[test]
 fn is_invalid_type_param_valid_unnamed_kind() {
     let ty = Type::new(Some("foo".into()), None, TypeKind::Void, false);
-    assert!(!ty.is_invalid_type_param())
+    assert!(!ty.is_invalid_type_param());
 }
 
 #[test]
 fn is_invalid_type_param_invalid_start() {
     let ty = Type::new(Some("1foo".into()), None, TypeKind::TypeParam, false);
-    assert!(ty.is_invalid_type_param())
+    assert!(ty.is_invalid_type_param());
 }
 
 #[test]
 fn is_invalid_type_param_invalid_remaining() {
     let ty = Type::new(Some("foo-".into()), None, TypeKind::TypeParam, false);
-    assert!(ty.is_invalid_type_param())
+    assert!(ty.is_invalid_type_param());
 }
 
 #[test]
 #[should_panic]
 fn is_invalid_type_param_unnamed() {
     let ty = Type::new(None, None, TypeKind::TypeParam, false);
-    assert!(ty.is_invalid_type_param())
+    assert!(ty.is_invalid_type_param());
 }
 
 #[test]
 fn is_invalid_type_param_empty_name() {
     let ty = Type::new(Some("".into()), None, TypeKind::TypeParam, false);
-    assert!(ty.is_invalid_type_param())
+    assert!(ty.is_invalid_type_param());
 }
 
 impl TemplateParameters for Type {
@@ -585,7 +585,7 @@ pub(crate) enum TypeKind {
     /// A compound type, that is, a class, struct, or union.
     Comp(CompInfo),
 
-    /// An opaque type that we just don't understand. All usage of this shoulf
+    /// An opaque type that we just don't understand. All usage of this should
     /// result in an opaque blob of bytes generated from the containing type's
     /// layout.
     Opaque,
@@ -626,7 +626,7 @@ pub(crate) enum TypeKind {
     /// A pointer to an Apple block.
     BlockPointer(TypeId),
 
-    /// A reference to a type, as in: int& foo().
+    /// A reference to a type, as in: int& `foo()`.
     /// The bool represents whether it's rvalue.
     Reference(TypeId, bool),
 
@@ -638,15 +638,10 @@ pub(crate) enum TypeKind {
     /// itself, and postpones its resolution.
     ///
     /// These are gone in a phase after parsing where these are mapped to
-    /// already known types, and are converted to ResolvedTypeRef.
+    /// already known types, and are converted to `ResolvedTypeRef`.
     ///
     /// see tests/headers/typeref.hpp to see somewhere where this is a problem.
-    UnresolvedTypeRef(
-        clang::Type,
-        clang::Cursor,
-        /* parent_id */
-        Option<ItemId>,
-    ),
+    UnresolvedTypeRef(clang::Type, Cursor, /* parent_id */ Option<ItemId>),
 
     /// An indirection to another type.
     ///
@@ -689,7 +684,7 @@ impl Type {
                 Some(location),
             );
             if let Some(ty) = already_resolved {
-                debug!("{:?} already resolved: {:?}", ty, location);
+                debug!("{ty:?} already resolved: {location:?}");
                 return Ok(ParseResult::AlreadyResolved(ty.into()));
             }
         }
@@ -704,8 +699,7 @@ impl Type {
         };
 
         debug!(
-            "from_clang_ty: {:?}, ty: {:?}, loc: {:?}",
-            potential_id, ty, location
+            "from_clang_ty: {potential_id:?}, ty: {ty:?}, loc: {location:?}"
         );
         debug!("currently_parsed_types: {:?}", ctx.currently_parsed_types());
 
@@ -715,7 +709,7 @@ impl Type {
         let mut ty_kind = ty.kind();
         match location.kind() {
             CXCursor_ObjCProtocolDecl | CXCursor_ObjCCategoryDecl => {
-                ty_kind = CXType_ObjCInterface
+                ty_kind = CXType_ObjCInterface;
             }
             _ => {}
         }
@@ -780,7 +774,7 @@ impl Type {
                                     // etc.
                                     !canonical_ty.spelling().contains("type-parameter") =>
                 {
-                    debug!("Looking for canonical type: {:?}", canonical_ty);
+                    debug!("Looking for canonical type: {canonical_ty:?}");
                     return Self::from_clang_ty(
                         potential_id,
                         &canonical_ty,
@@ -801,10 +795,7 @@ impl Type {
                     // Same here, with template specialisations we can safely
                     // assume this is a Comp(..)
                     } else if ty.is_fully_instantiated_template() {
-                        debug!(
-                            "Template specialization: {:?}, {:?} {:?}",
-                            ty, location, canonical_ty
-                        );
+                        debug!("Template specialization: {ty:?}, {location:?} {canonical_ty:?}");
                         let complex = CompInfo::from_ty(
                             potential_id,
                             ty,
@@ -873,20 +864,16 @@ impl Type {
                                     Some(location),
                                     ctx,
                                 );
-                                match complex {
-                                    Ok(complex) => TypeKind::Comp(complex),
-                                    Err(_) => {
-                                        warn!(
-                                            "Could not create complex type \
-                                             from class template or base \
-                                             specifier, using opaque blob"
-                                        );
-                                        let opaque =
-                                            Opaque::from_clang_ty(ty, ctx);
-                                        return Ok(ParseResult::New(
-                                            opaque, None,
-                                        ));
-                                    }
+                                if let Ok(complex) = complex {
+                                    TypeKind::Comp(complex)
+                                } else {
+                                    warn!(
+                                        "Could not create complex type \
+                                         from class template or base \
+                                         specifier, using opaque blob"
+                                    );
+                                    let opaque = Opaque::from_clang_ty(ty, ctx);
+                                    return Ok(ParseResult::New(opaque, None));
                                 }
                             }
                             CXCursor_TypeAliasTemplateDecl => {
@@ -934,16 +921,13 @@ impl Type {
                                     CXChildVisit_Continue
                                 });
 
-                                let inner_type = match inner {
-                                    Ok(inner) => inner,
-                                    Err(..) => {
-                                        warn!(
-                                            "Failed to parse template alias \
+                                let Ok(inner_type) = inner else {
+                                    warn!(
+                                        "Failed to parse template alias \
                                              {:?}",
-                                            location
-                                        );
-                                        return Err(ParseError::Continue);
-                                    }
+                                        location
+                                    );
+                                    return Err(ParseError::Continue);
                                 };
 
                                 TypeKind::TemplateAlias(inner_type, args)
@@ -952,13 +936,7 @@ impl Type {
                                 let referenced = location.referenced().unwrap();
                                 let referenced_ty = referenced.cur_type();
 
-                                debug!(
-                                    "TemplateRef: location = {:?}; referenced = \
-                                        {:?}; referenced_ty = {:?}",
-                                    location,
-                                    referenced,
-                                    referenced_ty
-                                );
+                                debug!("TemplateRef: location = {location:?}; referenced = {referenced:?}; referenced_ty = {referenced_ty:?}");
 
                                 return Self::from_clang_ty(
                                     potential_id,
@@ -973,11 +951,7 @@ impl Type {
                                 let referenced_ty = referenced.cur_type();
                                 let declaration = referenced_ty.declaration();
 
-                                debug!(
-                                    "TypeRef: location = {:?}; referenced = \
-                                     {:?}; referenced_ty = {:?}",
-                                    location, referenced, referenced_ty
-                                );
+                                debug!("TypeRef: location = {location:?}; referenced = {referenced:?}; referenced_ty = {referenced_ty:?}");
 
                                 let id = Item::from_ty_or_ref_with_id(
                                     potential_id,
@@ -995,16 +969,11 @@ impl Type {
                             }
                             _ => {
                                 if ty.kind() == CXType_Unexposed {
-                                    warn!(
-                                        "Unexposed type {:?}, recursing inside, \
-                                          loc: {:?}",
-                                        ty,
-                                        location
-                                    );
+                                    warn!("Unexposed type {ty:?}, recursing inside, loc: {location:?}");
                                     return Err(ParseError::Recurse);
                                 }
 
-                                warn!("invalid type {:?}", ty);
+                                warn!("invalid type {ty:?}");
                                 return Err(ParseError::Continue);
                             }
                         }
@@ -1012,7 +981,7 @@ impl Type {
                 }
                 CXType_Auto => {
                     if canonical_ty == *ty {
-                        debug!("Couldn't find deduced type: {:?}", ty);
+                        debug!("Couldn't find deduced type: {ty:?}");
                         return Err(ParseError::Continue);
                     }
 
@@ -1219,10 +1188,8 @@ impl Type {
                 }
                 _ => {
                     warn!(
-                        "unsupported type: kind = {:?}; ty = {:?}; at {:?}",
+                        "unsupported type: kind = {:?}; ty = {ty:?}; at {location:?}",
                         ty.kind(),
-                        ty,
-                        location
                     );
                     return Err(ParseError::Continue);
                 }
@@ -1233,8 +1200,7 @@ impl Type {
 
         let is_const = ty.is_const() ||
             (ty.kind() == CXType_ConstantArray &&
-                ty.elem_type()
-                    .map_or(false, |element| element.is_const()));
+                ty.elem_type().is_some_and(|element| element.is_const()));
 
         let ty = Type::new(name, layout, kind, is_const);
         // TODO: maybe declaration.canonical()?
@@ -1249,10 +1215,7 @@ impl Trace for Type {
     where
         T: Tracer,
     {
-        if self
-            .name()
-            .map_or(false, |name| context.is_stdint_type(name))
-        {
+        if self.name().is_some_and(|name| context.is_stdint_type(name)) {
             // These types are special-cased in codegen and don't need to be traversed.
             return;
         }

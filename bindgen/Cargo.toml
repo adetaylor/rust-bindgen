@@ -1,10 +1,12 @@
+lints.workspace = true
+
 [package]
 authors = [
-  "Jyun-Yan You <jyyou.tw@gmail.com>",
-  "Emilio Cobos Álvarez <emilio@crisal.io>",
-  "Nick Fitzgerald <fitzgen@gmail.com>",
-  "The Servo project developers",
-  "Adrian Taylor <ade@hohum.me.uk>",
+    "Jyun-Yan You <jyyou.tw@gmail.com>",
+    "Emilio Cobos Álvarez <emilio@crisal.io>",
+    "Nick Fitzgerald <fitzgen@gmail.com>",
+    "The Servo project developers",
+    "Adrian Taylor <ade@hohum.me.uk>",
 ]
 description = "Automatically generates Rust FFI bindings to C and C++ libraries. Version adjusted for autocxx."
 keywords = ["bindings", "ffi", "code-generation"]
@@ -15,30 +17,31 @@ readme = "../README.md"
 repository = "https://github.com/adetaylor/rust-bindgen"
 documentation = "https://docs.rs/bindgen"
 homepage = "https://rust-lang.github.io/rust-bindgen/"
-version = "0.70.1"
-edition = "2018"
+version = "0.71.1"
 build = "build.rs"
-# If you change this, also update README.md and msrv in .github/workflows/bindgen.yml
-rust-version = "1.70.0"
+rust-version.workspace = true
+edition.workspace = true
 
 [lib]
 name = "autocxx_bindgen"
 path = "lib.rs"
 
 [dependencies]
-annotate-snippets = { version = "0.11.4", optional = true }
-bitflags = "2.2.1"
-cexpr = "0.6"
-clang-sys = { version = "1", features = ["clang_11_0"] }
-itertools = { version = ">=0.10,<0.14", default-features = false }
-log = { version = "0.4", optional = true }
-prettyplease = { version = "0.2.7", optional = true, features = ["verbatim"] }
-proc-macro2 = { version = "1", default-features = false }
-quote = { version = "1", default-features = false }
-regex = { version = "1.5.3", default-features = false, features = ["std", "unicode-perl"] }
-rustc-hash = "1.0.1"
-shlex = "1"
-syn = { version = "2.0", features = ["full", "extra-traits", "visit-mut"] }
+annotate-snippets = { workspace = true, optional = true }
+bitflags.workspace = true
+cexpr.workspace = true
+clang-sys = { workspace = true, features = ["clang_11_0"] }
+clap = { workspace = true, features = ["derive"], optional = true }
+clap_complete = { workspace = true, optional = true }
+itertools = { workspace = true }
+log = { workspace = true, optional = true }
+prettyplease = { workspace = true, optional = true, features = ["verbatim"] }
+proc-macro2.workspace = true
+quote.workspace = true
+regex = { workspace = true, features = ["std", "unicode-perl"] }
+rustc-hash.workspace = true
+shlex.workspace = true
+syn = { workspace = true, features = ["full", "extra-traits", "visit-mut"] }
 
 [features]
 default = ["logging", "prettyplease", "runtime"]
@@ -52,7 +55,7 @@ experimental = ["dep:annotate-snippets"]
 ## The following features are for internal use and they shouldn't be used if
 ## you're not hacking on bindgen
 # Features used by `bindgen-cli`
-__cli = []
+__cli = ["dep:clap", "dep:clap_complete"]
 # Features used for CI testing
 __testing_only_extra_assertions = []
 __testing_only_libclang_9 = []

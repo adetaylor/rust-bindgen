@@ -14,7 +14,7 @@ const _: () = {
     ["Size of Bar"][::std::mem::size_of::<Bar>() - 1usize];
     ["Alignment of Bar"][::std::mem::align_of::<Bar>() - 1usize];
 };
-extern "C" {
+unsafe extern "C" {
     #[bindgen_original_name("Bar")]
     #[bindgen_special_member("default_ctor")]
     #[link_name = "\u{1}_ZN3BarC1Ev"]

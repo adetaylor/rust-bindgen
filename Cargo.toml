@@ -1,4 +1,5 @@
 [workspace]
+resolver = "2"
 members = [
     "bindgen",
     #"bindgen-cli",
@@ -7,31 +8,58 @@ members = [
     #"bindgen-tests/tests/quickchecking",
     #"bindgen-tests/tests/expectations",
 ]
-
 default-members = [
     "bindgen",
     #"bindgen-cli",
     #"bindgen-tests",
 ]
 
-# Config for 'cargo dist'
-[workspace.metadata.dist]
-# The preferred cargo-dist version to use in CI (Cargo.toml SemVer syntax)
-cargo-dist-version = "0.21.0"
-# CI backends to support
-ci = "github"
-# The installers to generate for each app
-installers = ["shell", "powershell"]
-# Target platforms to build apps for (Rust target-triple syntax)
-targets = ["aarch64-apple-darwin", "x86_64-apple-darwin", "x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc"]
-# Whether to consider the binaries in a package for distribution (defaults true)
-dist = false
-# Which actions to run on pull requests
-pr-run-mode = "plan"
-# Whether to install an updater program
-install-updater = false
-# Path that installers should place binaries in
-install-path = "CARGO_HOME"
+[workspace.package]
+# If you change this, also update README.md
+rust-version = "1.70.0"
+edition = "2021"
+
+# All dependency version management is centralized here
+[workspace.dependencies]
+annotate-snippets = "0.11.4"
+bindgen = { version = "0.71.1", path = "./bindgen", default-features = false }
+bitflags = "2.2.1"
+block = "0.1"
+cc = "1.0"
+cexpr = "0.6"
+clang-sys = "1"
+clap = "4"
+clap_complete = "4"
+env_logger = "0.10.0"
+itertools = { version = ">=0.10,<0.14", default-features = false }
+libloading = "0.8"
+log = "0.4"
+objc = "0.2"
+owo-colors = "4.1.0"
+prettyplease = "0.2.7"
+proc-macro2 = "1.0.80"
+quickcheck = "1.0"
+quote = { version = "1", default-features = false }
+regex = { version = "1.5.3", default-features = false }
+rustc-hash = "2.1.0"
+shlex = "1"
+similar = "2.2.1"
+syn = "2.0"
+tempfile = "3"
+
+[workspace.lints.rust]
+# unused_qualifications = "warn"
+
+[workspace.lints.clippy]
+# disallowed-names = "allow"
+# manual-c-str-literals = "allow"
+# missing-safety-doc = "allow"
+# op-ref = "allow"
+# ptr-offset-with-cast = "allow"
+# too-many-arguments = "allow"
+# transmute-int-to-bool = "allow"
+# unnecessary-cast = "allow"
+# useless-transmute  = "allow"
 
 # Config for 'cargo release'
 [workspace.metadata.release]

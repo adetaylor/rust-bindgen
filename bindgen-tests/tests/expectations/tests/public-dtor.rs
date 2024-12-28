@@ -10,7 +10,7 @@ const _: () = {
     ["Size of cv_Foo"][::std::mem::size_of::<cv_Foo>() - 1usize];
     ["Alignment of cv_Foo"][::std::mem::align_of::<cv_Foo>() - 1usize];
 };
-extern "C" {
+unsafe extern "C" {
     #[bindgen_original_name("Foo_destructor")]
     #[bindgen_special_member("dtor")]
     #[link_name = "\u{1}_ZN2cv3FooD1Ev"]

@@ -1,10 +1,12 @@
+lints.workspace = true
+
 [package]
 name = "quickchecking"
 description = "Bindgen property tests with quickcheck. Generate random valid C code and pass it to the csmith/predicate.py script"
 version = "0.0.0"
 publish = false
-rust-version = "1.70"
-edition = "2018"
+rust-version.workspace = true
+edition.workspace = true
 
 [lib]
 name = "quickchecking"
@@ -15,9 +17,9 @@ name = "quickchecking"
 path = "src/bin.rs"
 
 [dependencies]
-clap = "4"
-quickcheck = "1.0"
-tempfile = "3"
+clap.workspace = true
+quickcheck.workspace = true
+tempfile.workspace = true
 
 [features]
 # No features by default.

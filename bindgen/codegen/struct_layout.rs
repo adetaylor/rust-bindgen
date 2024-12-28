@@ -148,7 +148,7 @@ impl<'a> StructLayoutTracker<'a> {
     }
 
     pub(crate) fn saw_bitfield_unit(&mut self, layout: Layout) {
-        debug!("saw bitfield unit for {}: {:?}", self.name, layout);
+        debug!("saw bitfield unit for {}: {layout:?}", self.name);
 
         self.align_to_latest_field(layout);
 
@@ -248,12 +248,9 @@ impl<'a> StructLayoutTracker<'a> {
             );
 
             debug!(
-                "align field {} to {}/{} with {} padding bytes {:?}",
-                field_name,
+                "align field {field_name} to {}/{} with {padding_bytes} padding bytes {field_layout:?}",
                 self.latest_offset,
                 field_offset.unwrap_or(0) / 8,
-                padding_bytes,
-                field_layout
             );
 
             let padding_align = if force_padding {
@@ -276,8 +273,7 @@ impl<'a> StructLayoutTracker<'a> {
         self.last_field_was_bitfield = false;
 
         debug!(
-            "Offset: {}: {} -> {}",
-            field_name,
+            "Offset: {field_name}: {} -> {}",
             self.latest_offset - field_layout.size,
             self.latest_offset
         );
@@ -312,8 +308,7 @@ impl<'a> StructLayoutTracker<'a> {
         }
 
         trace!(
-            "need a tail padding field for {}: offset {} -> size {}",
-            comp_name,
+            "need a tail padding field for {comp_name}: offset {} -> size {}",
             self.latest_offset,
             comp_layout.size
         );
@@ -325,10 +320,7 @@ impl<'a> StructLayoutTracker<'a> {
         &mut self,
         layout: Layout,
     ) -> Option<proc_macro2::TokenStream> {
-        debug!(
-            "pad_struct:\n\tself = {:#?}\n\tlayout = {:#?}",
-            self, layout
-        );
+        debug!("pad_struct:\n\tself = {self:#?}\n\tlayout = {layout:#?}");
 
         if layout.size < self.latest_offset {
             warn!(
@@ -344,7 +336,7 @@ impl<'a> StructLayoutTracker<'a> {
             return None;
         }
 
-        let repr_align = self.ctx.options().rust_features().repr_align;
+        let repr_align = true;
 
         // We always pad to get to the correct size if the struct is one of
         // those we can't align properly.
@@ -368,7 +360,7 @@ impl<'a> StructLayoutTracker<'a> {
                 Layout::new(padding_bytes, layout.align)
             };
 
-            debug!("pad bytes to struct {}, {:?}", self.name, layout);
+            debug!("pad bytes to struct {}, {layout:?}", self.name);
 
             Some(self.padding_field(layout))
         } else {
@@ -377,7 +369,7 @@ impl<'a> StructLayoutTracker<'a> {
     }
 
     pub(crate) fn requires_explicit_align(&self, layout: Layout) -> bool {
-        let repr_align = self.ctx.options().rust_features().repr_align;
+        let repr_align = true;
 
         // Always force explicit repr(align) for stuff more than 16-byte aligned
         // to work-around https://github.com/rust-lang/rust/issues/54341.
@@ -401,13 +393,13 @@ impl<'a> StructLayoutTracker<'a> {
     }
 
     fn padding_field(&mut self, layout: Layout) -> proc_macro2::TokenStream {
-        let ty = helpers::blob(self.ctx, layout);
+        let ty = helpers::blob(self.ctx, layout, false);
         let padding_count = self.padding_count;
 
         self.padding_count += 1;
 
         let padding_field_name = Ident::new(
-            &format!("__bindgen_padding_{}", padding_count),
+            &format!("__bindgen_padding_{padding_count}"),
             Span::call_site(),
         );
 
@@ -422,23 +414,22 @@ impl<'a> StructLayoutTracker<'a> {
 
     /// Returns whether the new field is known to merge with a bitfield.
     ///
-    /// This is just to avoid doing the same check also in pad_field.
+    /// This is just to avoid doing the same check also in `pad_field`.
     fn align_to_latest_field(&mut self, new_field_layout: Layout) -> bool {
         if self.is_packed {
             // Skip to align fields when packed.
             return false;
         }
 
-        let layout = match self.latest_field_layout {
-            Some(l) => l,
-            None => return false,
+        let Some(layout) = self.latest_field_layout else {
+            return false;
         };
 
         // If it was, we may or may not need to align, depending on what the
         // current field alignment and the bitfield size and alignment are.
         debug!(
-            "align_to_bitfield? {}: {:?} {:?}",
-            self.last_field_was_bitfield, layout, new_field_layout
+            "align_to_bitfield? {}: {layout:?} {new_field_layout:?}",
+            self.last_field_was_bitfield,
         );
 
         // Avoid divide-by-zero errors if align is 0.

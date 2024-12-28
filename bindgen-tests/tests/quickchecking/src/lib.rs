@@ -6,13 +6,10 @@
 //! use quickcheck::{Arbitrary, Gen};
 //! use quickchecking::fuzzers;
 //!
-//! fn main() {
-//!     let generate_range: usize = 10; // Determines things like the length of
-//!                                     // arbitrary vectors generated.
-//!     let header = fuzzers::HeaderC::arbitrary(
-//!        &mut Gen::new(generate_range));
-//!     println!("{}", header);
-//! }
+//! let generate_range: usize = 10; // Determines things like the length of
+//!                                 // arbitrary vectors generated.
+//! let header = fuzzers::HeaderC::arbitrary(&mut Gen::new(generate_range));
+//! println!("{header}");
 //! ```
 #![deny(missing_docs)]
 
@@ -84,7 +81,7 @@ fn bindgen_prop(header: fuzzers::HeaderC) -> TestResult {
     match run_predicate_script(header) {
         Ok(o) => TestResult::from_bool(o.status.success()),
         Err(e) => {
-            println!("{:?}", e);
+            println!("{e:?}");
             TestResult::from_bool(false)
         }
     }
@@ -106,5 +103,5 @@ pub fn test_bindgen(
     QuickCheck::new()
         .tests(tests)
         .gen(Gen::new(generate_range))
-        .quickcheck(bindgen_prop as fn(fuzzers::HeaderC) -> TestResult)
+        .quickcheck(bindgen_prop as fn(fuzzers::HeaderC) -> TestResult);
 }

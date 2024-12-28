@@ -28,7 +28,7 @@ impl FromStr for FieldVisibilityKind {
             "private" => Ok(Self::Private),
             "crate" => Ok(Self::PublicCrate),
             "public" => Ok(Self::Public),
-            _ => Err(format!("Invalid visibility kind: `{}`", s)),
+            _ => Err(format!("Invalid visibility kind: `{s}`")),
         }
     }
 }
@@ -213,7 +213,7 @@ impl Annotations {
             comment
                 .get_tag_attrs()
                 .next()
-                .map_or(false, |attr| attr.name == "rustbindgen")
+                .is_some_and(|attr| attr.name == "rustbindgen")
         {
             *matched = true;
             for attr in comment.get_tag_attrs() {
@@ -227,19 +227,19 @@ impl Annotations {
                     "replaces" => {
                         self.use_instead_of = Some(
                             attr.value.split("::").map(Into::into).collect(),
-                        )
+                        );
                     }
                     "derive" => self.derives.push(attr.value),
                     "attribute" => self.attributes.push(attr.value),
                     "private" => {
-                        self.visibility_kind = if attr.value != "false" {
-                            Some(FieldVisibilityKind::Private)
-                        } else {
+                        self.visibility_kind = if attr.value == "false" {
                             Some(FieldVisibilityKind::Public)
+                        } else {
+                            Some(FieldVisibilityKind::Private)
                         };
                     }
                     "accessor" => {
-                        self.accessor_kind = Some(parse_accessor(&attr.value))
+                        self.accessor_kind = Some(parse_accessor(&attr.value));
                     }
                     "constant" => self.constify_enum_variant = true,
                     _ => {}

@@ -2,6 +2,7 @@ use crate::ir::comp::{BitfieldUnit, CompKind, Field, FieldData, FieldMethods};
 use crate::ir::context::BindgenContext;
 use crate::ir::item::{HasTypeParamInArray, IsOpaque, Item, ItemCanonicalName};
 use crate::ir::ty::{TypeKind, RUST_DERIVE_IN_ARRAY_LIMIT};
+use std::fmt::Write as _;
 
 pub(crate) fn gen_debug_impl(
     ctx: &BindgenContext,
@@ -10,7 +11,7 @@ pub(crate) fn gen_debug_impl(
     kind: CompKind,
 ) -> proc_macro2::TokenStream {
     let struct_name = item.canonical_name(ctx);
-    let mut format_string = format!("{} {{{{ ", struct_name);
+    let mut format_string = format!("{struct_name} {{{{ ");
     let mut tokens = vec![];
 
     if item.is_opaque(ctx, &()) {
@@ -64,7 +65,7 @@ pub(crate) trait ImplDebug<'a> {
     ) -> Option<(String, Vec<proc_macro2::TokenStream>)>;
 }
 
-impl<'a> ImplDebug<'a> for FieldData {
+impl ImplDebug<'_> for FieldData {
     type Extra = ();
 
     fn impl_debug(
@@ -80,7 +81,7 @@ impl<'a> ImplDebug<'a> for FieldData {
     }
 }
 
-impl<'a> ImplDebug<'a> for BitfieldUnit {
+impl ImplDebug<'_> for BitfieldUnit {
     type Extra = ();
 
     fn impl_debug(
@@ -96,7 +97,7 @@ impl<'a> ImplDebug<'a> for BitfieldUnit {
             }
 
             if let Some(bitfield_name) = bitfield.name() {
-                format_string.push_str(&format!("{} : {{:?}}", bitfield_name));
+                let _ = write!(format_string, "{bitfield_name} : {{:?}}");
                 let getter_name = bitfield.getter_name();
                 let name_ident = ctx.rust_ident_raw(getter_name);
                 tokens.push(quote! {
@@ -125,19 +126,14 @@ impl<'a> ImplDebug<'a> for Item {
             return None;
         }
 
-        let ty = match self.as_type() {
-            Some(ty) => ty,
-            None => {
-                return None;
-            }
-        };
+        let ty = self.as_type()?;
 
         fn debug_print(
             name: &str,
             name_ident: proc_macro2::TokenStream,
         ) -> Option<(String, Vec<proc_macro2::TokenStream>)> {
             Some((
-                format!("{}: {{:?}}", name),
+                format!("{name}: {{:?}}"),
                 vec![quote! {
                     self.#name_ident
                 }],
@@ -162,7 +158,7 @@ impl<'a> ImplDebug<'a> for Item {
 
             TypeKind::TemplateInstantiation(ref inst) => {
                 if inst.is_opaque(ctx, self) {
-                    Some((format!("{}: opaque", name), vec![]))
+                    Some((format!("{name}: opaque"), vec![]))
                 } else {
                     debug_print(name, quote! { #name_ident })
                 }
@@ -170,16 +166,13 @@ impl<'a> ImplDebug<'a> for Item {
 
             // The generic is not required to implement Debug, so we can not debug print that type
             TypeKind::TypeParam => {
-                Some((format!("{}: Non-debuggable generic", name), vec![]))
+                Some((format!("{name}: Non-debuggable generic"), vec![]))
             }
 
             TypeKind::Array(_, len) => {
                 // Generics are not required to implement Debug
                 if self.has_type_param_in_array(ctx) {
-                    Some((
-                        format!("{}: Array with length {}", name, len),
-                        vec![],
-                    ))
+                    Some((format!("{name}: Array with length {len}"), vec![]))
                 } else if len < RUST_DERIVE_IN_ARRAY_LIMIT ||
                     ctx.options().rust_features().larger_arrays
                 {
@@ -188,18 +181,23 @@ impl<'a> ImplDebug<'a> for Item {
                 } else if ctx.options().use_core {
                     // There is no String in core; reducing field visibility to avoid breaking
                     // no_std setups.
-                    Some((format!("{}: [...]", name), vec![]))
+                    Some((format!("{name}: [...]"), vec![]))
                 } else {
                     // Let's implement our own print function
                     Some((
-                        format!("{}: [{{}}]", name),
-                        vec![quote! {
-                            self.#name_ident
-                                .iter()
-                                .enumerate()
-                                .map(|(i, v)| format!("{}{:?}", if i > 0 { ", " } else { "" }, v))
-                                .collect::<String>()
-                        }],
+                        format!("{name}: [{{}}]"),
+                        vec![quote! {{
+                            use std::fmt::Write as _;
+                            let mut output = String::new();
+                            let mut iter = self.#name_ident.iter();
+                            if let Some(value) = iter.next() {
+                                let _ = write!(output, "{value:?}");
+                                for value in iter {
+                                    let _ = write!(output, ", {value:?}");
+                                }
+                            }
+                            output
+                        }}],
                     ))
                 }
             }
@@ -207,11 +205,11 @@ impl<'a> ImplDebug<'a> for Item {
                 if ctx.options().use_core {
                     // There is no format! in core; reducing field visibility to avoid breaking
                     // no_std setups.
-                    Some((format!("{}(...)", name), vec![]))
+                    Some((format!("{name}(...)"), vec![]))
                 } else {
                     let self_ids = 0..len;
                     Some((
-                        format!("{}({{}})", name),
+                        format!("{name}({{}})"),
                         vec![quote! {
                             #(format!("{:?}", self.#self_ids)),*
                         }],
@@ -233,7 +231,7 @@ impl<'a> ImplDebug<'a> for Item {
                     TypeKind::Function(ref sig)
                         if !sig.function_pointers_can_derive() =>
                     {
-                        Some((format!("{}: FunctionPointer", name), vec![]))
+                        Some((format!("{name}: FunctionPointer"), vec![]))
                     }
                     _ => debug_print(name, quote! { #name_ident }),
                 }

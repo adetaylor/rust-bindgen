@@ -24,7 +24,7 @@ impl Default for nsISupports {
         }
     }
 }
-extern "C" {
+unsafe extern "C" {
     #[bindgen_original_name("QueryInterface")]
     #[link_name = "\u{1}_ZN11nsISupports14QueryInterfaceEv"]
     pub fn nsISupports_QueryInterface(

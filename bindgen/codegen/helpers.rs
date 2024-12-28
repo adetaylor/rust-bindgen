@@ -22,7 +22,6 @@ pub(crate) mod attributes {
     pub(crate) fn repr_list(which_ones: &[&str]) -> TokenStream {
         let which_ones = which_ones
             .iter()
-            .cloned()
             .map(|one| TokenStream::from_str(one).expect("repr to be valid"));
         quote! {
             #[repr( #( #which_ones ),* )]
@@ -32,7 +31,6 @@ pub(crate) mod attributes {
     pub(crate) fn derives(which_ones: &[&str]) -> TokenStream {
         let which_ones = which_ones
             .iter()
-            .cloned()
             .map(|one| TokenStream::from_str(one).expect("derive to be valid"));
         quote! {
             #[derive( #( #which_ones ),* )]
@@ -71,7 +69,7 @@ pub(crate) mod attributes {
         let name: Cow<'_, str> = if MANGLE {
             name.into()
         } else {
-            format!("\u{1}{}", name).into()
+            format!("\u{1}{name}").into()
         };
 
         quote! {
@@ -264,38 +262,48 @@ impl CppSemanticAttributeCreator for CppSemanticAttributeSingle {
     }
 }
 
-/// Generates a proper type for a field or type with a given `Layout`, that is,
-/// a type with the correct size and alignment restrictions.
-pub(crate) fn blob(ctx: &BindgenContext, layout: Layout) -> syn::Type {
+/// The `ffi_safe` argument should be true if this is a type that the user might
+/// reasonably use, e.g. not struct padding, where the `__BindgenOpaqueArray` is
+/// just noise.
+/// TODO: Should this be `MaybeUninit`, since padding bytes are effectively
+/// uninitialized?
+pub(crate) fn blob(
+    ctx: &BindgenContext,
+    layout: Layout,
+    ffi_safe: bool,
+) -> syn::Type {
     let opaque = layout.opaque();
 
     // FIXME(emilio, #412): We fall back to byte alignment, but there are
     // some things that legitimately are more than 8-byte aligned.
     //
     // Eventually we should be able to `unwrap` here, but...
-    let ty = match opaque.known_rust_type_for_array(ctx) {
-        Some(ty) => ty,
-        None => {
-            warn!("Found unknown alignment on code generation!");
-            syn::parse_quote! { u8 }
-        }
-    };
+    let ty = opaque.known_rust_type_for_array().unwrap_or_else(|| {
+        warn!("Found unknown alignment on code generation!");
+        syn::parse_quote! { u8 }
+    });
 
-    let data_len = opaque.array_size(ctx).unwrap_or(layout.size);
+    let data_len = opaque.array_size().unwrap_or(layout.size);
 
     if data_len == 1 {
         ty
+    } else if ffi_safe && ctx.options().rust_features().min_const_generics {
+        ctx.generated_opaque_array();
+        if ctx.options().enable_cxx_namespaces {
+            syn::parse_quote! { root::__BindgenOpaqueArray<#ty, #data_len> }
+        } else {
+            syn::parse_quote! { __BindgenOpaqueArray<#ty, #data_len> }
+        }
     } else {
+        // This is not FFI safe as an argument; the struct above is
+        // preferable.
         syn::parse_quote! { [ #ty ; #data_len ] }
     }
 }
 
 /// Integer type of the same size as the given `Layout`.
-pub(crate) fn integer_type(
-    ctx: &BindgenContext,
-    layout: Layout,
-) -> Option<syn::Type> {
-    Layout::known_type_for_size(ctx, layout.size)
+pub(crate) fn integer_type(layout: Layout) -> Option<syn::Type> {
+    Layout::known_type_for_size(layout.size)
 }
 
 pub(crate) const BITFIELD_UNIT: &str = "__BindgenBitfieldUnit";
@@ -330,9 +338,7 @@ pub(crate) mod ast_ty {
                 syn::parse_quote! { #prefix::c_void }
             }
             None => {
-                if ctx.options().use_core &&
-                    ctx.options().rust_features.core_ffi_c_void
-                {
+                if ctx.options().use_core {
                     syn::parse_quote! { ::core::ffi::c_void }
                 } else {
                     syn::parse_quote! { ::std::os::raw::c_void }
@@ -382,7 +388,7 @@ pub(crate) mod ast_ty {
             IntKind::WChar => {
                 let layout =
                     layout.expect("Couldn't compute wchar_t's layout?");
-                Layout::known_type_for_size(ctx, layout.size)
+                Layout::known_type_for_size(layout.size)
                     .expect("Non-representable wchar_t?")
             }
 
@@ -398,7 +404,7 @@ pub(crate) mod ast_ty {
                 syn::parse_str(name).expect("Invalid integer type.")
             }
             IntKind::U128 => {
-                if ctx.options().rust_features.i128_and_u128 {
+                if true {
                     syn::parse_quote! { u128 }
                 } else {
                     // Best effort thing, but wrong alignment
@@ -407,7 +413,7 @@ pub(crate) mod ast_ty {
                 }
             }
             IntKind::I128 => {
-                if ctx.options().rust_features.i128_and_u128 {
+                if true {
                     syn::parse_quote! { i128 }
                 } else {
                     syn::parse_quote! { [u64; 2] }
@@ -440,28 +446,25 @@ pub(crate) mod ast_ty {
             (FloatKind::Float, false) => raw_type(ctx, "c_float"),
             (FloatKind::Double, false) => raw_type(ctx, "c_double"),
             (FloatKind::LongDouble, _) => {
-                match layout {
-                    Some(layout) => {
-                        match layout.size {
-                            4 => syn::parse_quote! { f32 },
-                            8 => syn::parse_quote! { f64 },
-                            // TODO(emilio): If rust ever gains f128 we should
-                            // use it here and below.
-                            _ => super::integer_type(ctx, layout)
-                                .unwrap_or(syn::parse_quote! { f64 }),
-                        }
+                if let Some(layout) = layout {
+                    match layout.size {
+                        4 => syn::parse_quote! { f32 },
+                        8 => syn::parse_quote! { f64 },
+                        // TODO(emilio): If rust ever gains f128 we should
+                        // use it here and below.
+                        _ => super::integer_type(layout)
+                            .unwrap_or(syn::parse_quote! { f64 }),
                     }
-                    None => {
-                        debug_assert!(
-                            false,
-                            "How didn't we know the layout for a primitive type?"
-                        );
-                        syn::parse_quote! { f64 }
-                    }
+                } else {
+                    debug_assert!(
+                        false,
+                        "How didn't we know the layout for a primitive type?"
+                    );
+                    syn::parse_quote! { f64 }
                 }
             }
             (FloatKind::Float128, _) => {
-                if ctx.options().rust_features.i128_and_u128 {
+                if true {
                     syn::parse_quote! { u128 }
                 } else {
                     syn::parse_quote! { [u64; 2] }
@@ -504,6 +507,8 @@ pub(crate) mod ast_ty {
         let rust_target = ctx.options().rust_target;
 
         if f.is_nan() {
+            // FIXME: This should be done behind a `RustFeature` instead
+            #[allow(deprecated)]
             let tokens = if rust_target >= RustTarget::Stable_1_43 {
                 quote! {
                     f64::NAN
@@ -518,6 +523,8 @@ pub(crate) mod ast_ty {
 
         if f.is_infinite() {
             let tokens = if f.is_sign_positive() {
+                // FIXME: This should be done behind a `RustFeature` instead
+                #[allow(deprecated)]
                 if rust_target >= RustTarget::Stable_1_43 {
                     quote! {
                         f64::INFINITY
@@ -528,6 +535,8 @@ pub(crate) mod ast_ty {
                     }
                 }
             } else {
+                // FIXME: This should be done behind a `RustFeature` instead
+                #[allow(deprecated)]
                 // Negative infinity
                 if rust_target >= RustTarget::Stable_1_43 {
                     quote! {
@@ -542,7 +551,7 @@ pub(crate) mod ast_ty {
             return Ok(tokens);
         }
 
-        warn!("Unknown non-finite float number: {:?}", f);
+        warn!("Unknown non-finite float number: {f:?}");
         Err(())
     }
 
@@ -554,17 +563,14 @@ pub(crate) mod ast_ty {
         signature
             .argument_types()
             .iter()
-            .map(|&(ref name, _ty)| match *name {
-                Some(ref name) => {
-                    let name = ctx.rust_ident(name);
-                    quote! { #name }
-                }
-                None => {
+            .map(|&(ref name, _ty)| {
+                let name = if let Some(ref name) = *name {
+                    ctx.rust_ident(name)
+                } else {
                     unnamed_arguments += 1;
-                    let name =
-                        ctx.rust_ident(format!("arg{}", unnamed_arguments));
-                    quote! { #name }
-                }
+                    ctx.rust_ident(format!("arg{unnamed_arguments}"))
+                };
+                quote! { #name }
             })
             .collect()
     }

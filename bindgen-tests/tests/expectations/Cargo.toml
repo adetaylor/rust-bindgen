@@ -7,10 +7,40 @@ authors = [
   "Emilio Cobos Álvarez <emilio@crisal.io>",
   "The Servo project developers",
 ]
-edition = "2018"
 publish = false
+rust-version.workspace = true
+edition.workspace = true
 
 [dependencies]
-block = "0.1"
-libloading = "0.7"
-objc = "0.2"
+block.workspace = true
+libloading.workspace = true
+objc.workspace = true
+
+# Both of these sections need to be copied here from the workspace because
+# Cargo currently does not allow overriding workspace settings in a member
+[lints.rust]
+### FIXME: these might need to be fixed,
+###   esp the calling convention, because it is a hard error now
+# deprecated = "allow"
+# invalid-value = "allow"
+# unsupported_calling_conventions = "allow"
+#
+# Different from the workspace
+dead_code = "allow"
+non-snake-case = "allow"
+non_camel_case_types = "allow"
+non_upper_case_globals = "allow"
+unexpected-cfgs = "allow"
+unused_qualifications = "allow"
+
+[lints.clippy]
+disallowed-names = "allow"
+manual-c-str-literals = "allow"
+missing-safety-doc = "allow"
+op-ref = "allow"
+ptr-offset-with-cast = "allow"
+semicolon_if_nothing_returned = "allow"
+too-many-arguments = "allow"
+transmute-int-to-bool = "allow"
+unnecessary-cast = "allow"
+useless-transmute  = "allow"

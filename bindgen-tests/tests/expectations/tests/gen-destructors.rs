@@ -10,7 +10,7 @@ const _: () = {
     ["Alignment of Foo"][::std::mem::align_of::<Foo>() - 4usize];
     ["Offset of field: Foo::bar"][::std::mem::offset_of!(Foo, bar) - 0usize];
 };
-extern "C" {
+unsafe extern "C" {
     #[bindgen_original_name("Foo_destructor")]
     #[bindgen_special_member("dtor")]
     #[link_name = "\u{1}_ZN3FooD1Ev"]

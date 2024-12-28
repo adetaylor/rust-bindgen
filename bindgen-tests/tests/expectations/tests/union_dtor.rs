@@ -15,7 +15,7 @@ const _: () = {
         "Offset of field: UnionWithDtor::mBar",
     ][::std::mem::offset_of!(UnionWithDtor, mBar) - 0usize];
 };
-extern "C" {
+unsafe extern "C" {
     #[bindgen_original_name("UnionWithDtor_destructor")]
     #[bindgen_special_member("dtor")]
     #[link_name = "\u{1}_ZN13UnionWithDtorD1Ev"]

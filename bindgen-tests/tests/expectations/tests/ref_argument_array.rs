@@ -26,7 +26,7 @@ impl Default for nsID {
         }
     }
 }
-extern "C" {
+unsafe extern "C" {
     #[bindgen_arg_type_reference(aDest)]
     #[bindgen_original_name("ToProvidedString")]
     #[link_name = "\u{1}_ZN4nsID16ToProvidedStringERA10_c"]

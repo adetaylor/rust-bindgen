@@ -153,7 +153,7 @@ pub(crate) struct Function {
     /// The mangled name, that is, the symbol.
     mangled_name: Option<String>,
 
-    /// The link name. If specified, overwrite mangled_name.
+    /// The link name. If specified, overwrite `mangled_name`.
     link_name: Option<String>,
 
     /// The ID pointing to the current function signature.
@@ -254,11 +254,7 @@ impl DotAttributes for Function {
         if let Some(ref mangled) = self.mangled_name {
             let mangled: String =
                 mangled.chars().flat_map(|c| c.escape_default()).collect();
-            writeln!(
-                out,
-                "<tr><td>mangled name</td><td>{}</td></tr>",
-                mangled
-            )?;
+            writeln!(out, "<tr><td>mangled name</td><td>{mangled}</td></tr>")?;
         }
 
         Ok(())
@@ -305,7 +301,7 @@ impl FromStr for Abi {
             "win64" => Ok(Self::Win64),
             "C-unwind" => Ok(Self::CUnwind),
             "system" => Ok(Self::System),
-            _ => Err(format!("Invalid or unknown ABI {:?}", s)),
+            _ => Err(format!("Invalid or unknown ABI {s:?}")),
         }
     }
 }
@@ -357,8 +353,7 @@ impl quote::ToTokens for ClangAbi {
         match *self {
             Self::Known(abi) => abi.to_tokens(tokens),
             Self::Unknown(cc) => panic!(
-                "Cannot turn unknown calling convention to tokens: {:?}",
-                cc
+                "Cannot turn unknown calling convention to tokens: {cc:?}"
             ),
         }
     }
@@ -519,7 +514,7 @@ impl FunctionSig {
         ctx: &mut BindgenContext,
     ) -> Result<Self, ParseError> {
         use clang_sys::*;
-        debug!("FunctionSig::from_ty {:?} {:?}", ty, cursor);
+        debug!("FunctionSig::from_ty {ty:?} {cursor:?}");
 
         // Skip function templates
         let kind = cursor.kind();
@@ -691,7 +686,7 @@ impl FunctionSig {
         let abi = get_abi(call_conv);
 
         if abi.is_unknown() {
-            warn!("Unknown calling convention: {:?}", call_conv);
+            warn!("Unknown calling convention: {call_conv:?}");
         }
 
         Ok(Self {
@@ -821,7 +816,7 @@ impl ClangSubItemParser for Function {
             Some(k) => k,
         };
 
-        debug!("Function::parse({:?}, {:?})", cursor, cursor.cur_type());
+        debug!("Function::parse({cursor:?}, {:?})", cursor.cur_type());
         let visibility = cursor.visibility();
         if visibility != CXVisibility_Default {
             return Err(ParseError::Continue);
@@ -837,9 +832,7 @@ impl ClangSubItemParser for Function {
         };
 
         if cursor.is_inlined_function() ||
-            cursor
-                .definition()
-                .map_or(false, |x| x.is_inlined_function())
+            cursor.definition().is_some_and(|x| x.is_inlined_function())
         {
             if !context.options().generate_inline_functions &&
                 !context.options().wrap_static_fns

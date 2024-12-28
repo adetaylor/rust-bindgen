@@ -4,14 +4,35 @@ on:
   pull_request:
     types:
       - closed
-
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: 'Commit hash'
+        required: true
+        type: string
 jobs:
   create-tag:
-    if: github.event.pull_request.merged == true && github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name && startsWith(github.event.pull_request.head.ref, 'bump-version')
+    if: >-
+      (inputs.commit || false) ||
+      (github.event.pull_request.merged == true &&
+       github.event.pull_request.user.login == 'github-actions' &&
+       github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name &&
+       startsWith(github.event.pull_request.head.ref, 'bump-version') )
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Compute the commit
+        run: |
+          if [[ -z "${{ inputs.commit }}" ]]; then
+            COMMIT=$(git rev-parse ${{ github.sha }}^@ | grep -Fvx ${{ github.event.pull_request.head.sha }})
+          else
+            COMMIT="${{ inputs.commit }}"
+          fi
+          echo "commit=$COMMIT" >> $GITHUB_ENV
 
       - name: Install rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -21,7 +42,8 @@ jobs:
           echo "version=$(cargo pkgid -p bindgen | cut -d '#' -f 2)" >> $GITHUB_ENV
  
       - name: Create tag
-        run: |
-          TAG_NAME="v${{ env.version }}"
-          git tag $TAG_NAME
-          git push origin $TAG_NAME
+        uses: mathieudutour/github-tag-action@v6.2
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          commit_sha: ${{ env.commit }} 
+          custom_tag: ${{ env.version }}

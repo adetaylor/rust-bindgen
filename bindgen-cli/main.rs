@@ -1,8 +1,7 @@
 use autocxx_bindgen as bindgen;
 use std::env;
 
-mod options;
-use crate::options::builder_from_flags;
+use bindgen::builder_from_flags;
 
 #[cfg(feature = "logging")]
 fn clang_version_check() {
@@ -37,20 +36,25 @@ pub fn main() {
 
             std::panic::set_hook(Box::new(move |info| {
                 if verbose {
-                    print_verbose_err()
+                    print_verbose_err();
                 }
-                eprintln!("{}", info);
+                eprintln!("{info}");
             }));
 
-            let bindings =
-                builder.generate().expect("Unable to generate bindings");
+            let bindings = match builder.generate() {
+                Ok(bindings) => bindings,
+                Err(err) => {
+                    eprintln!("Unable to generate bindings: {err}");
+                    std::process::exit(1)
+                }
+            };
 
             let _ = std::panic::take_hook();
 
             bindings.write(output).expect("Unable to write output");
         }
         Err(error) => {
-            eprintln!("{}", error);
+            eprintln!("{error}");
             std::process::exit(1);
         }
     };

@@ -37,25 +37,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Read crate metadata
+        id: metadata
+        run: echo "rust-version=$(sed -ne 's/rust-version *= *\"\(.*\)\"/\1/p' Cargo.toml)" >> $GITHUB_OUTPUT
+
       - name: Install msrv for lib
         uses: dtolnay/rust-toolchain@master
         with:
-          # MSRV below is documented in Cargo.toml and README.md, please update those if you
-          # change this.
-          toolchain: 1.70.0
+          toolchain: ${{ steps.metadata.outputs.rust-version }}
 
       - name: Test lib with msrv
-        run: cargo +1.70.0 test --package bindgen
+        run: cargo +${{ steps.metadata.outputs.rust-version }} test --package bindgen
 
       - name: Install msrv for cli
         uses: dtolnay/rust-toolchain@master
         with:
-          # MSRV below is documented in Cargo.toml and README.md, please update those if you
-          # change this.
-          toolchain: 1.70.0
+          toolchain: ${{ steps.metadata.outputs.rust-version }}
 
       - name: Test cli with msrv
-        run: cargo +1.70.0 build --package bindgen-cli
+        run: cargo +${{ steps.metadata.outputs.rust-version }} build --package bindgen-cli
 
   minimal:
     runs-on: ubuntu-latest
@@ -108,7 +108,7 @@ jobs:
     runs-on: ${{matrix.os}}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-12]
+        os: [ubuntu-latest, macos-latest]
     steps:
       - uses: actions/checkout@v4
 
@@ -125,12 +125,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest]
-        target:
-          - debian: null
-            cross: null
-            rust: null
         llvm_version: ["9.0", "16.0"]
-        main_tests: [1]
         release_build: [0, 1]
         no_default_features: [0, 1]
         # FIXME: There are no pre-built static libclang libraries, so the
@@ -147,64 +142,31 @@ jobs:
             no_default_features: 0
             feature_extra_asserts: 1
 
-          # FIXME: Seems installing multiarch packages fails:
-          #
-          #   https://github.com/rust-lang/rust-bindgen/pull/2037/checks?check_run_id=2441799333
-          #
-          # - os: ubuntu-latest
-          #   target:
-          #     debian: arm64
-          #     cross: aarch64-linux-gnu
-          #     rust: aarch64-unknown-linux-gnu
-          #   llvm_version: "16.0"
-          #   main_tests: 0
-          #   release_build: 0
-          #   feature_extra_asserts: 0
-
           # Ensure stuff works on macos too
-          # FIXME: Ideally should use the latest llvm version, but llvm doesn't
-          # provide releases for x86-64 macOS anymore which is what the runner uses.
-          #
-          - os: macos-12
-            llvm_version: "9.0"
+          - os: macos-latest
+            llvm_version: "16.0"
             release_build: 0
             no_default_features: 0
             feature_extra_asserts: 0
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install multiarch packages
-        if: matrix.target.debian
-        run: |
-          sudo apt-get install binfmt-support qemu-user-static gcc-${{matrix.target.cross}} g++-${{matrix.target.cross}}
-          source /etc/lsb-release
-          sudo tee /etc/apt/sources.list <<EOF >/dev/null
-          deb [arch=${{matrix.target.debian}}] http://ports.ubuntu.com/ubuntu-ports/ $DISTRIB_CODENAME main
-          deb [arch=${{matrix.target.debian}}] http://ports.ubuntu.com/ubuntu-ports/ $DISTRIB_CODENAME-updates main
-          deb [arch=${{matrix.target.debian}}] http://ports.ubuntu.com/ubuntu-ports/ $DISTRIB_CODENAME-backports main
-          deb [arch=${{matrix.target.debian}}] http://ports.ubuntu.com/ubuntu-ports/ $DISTRIB_CODENAME-security main
-          EOF
-          sudo dpkg --add-architecture ${{matrix.target.debian}}
-          sudo apt-get update
-          sudo apt-get install libc6:${{matrix.target.debian}} libstdc++6:${{matrix.target.debian}}
-
       - name: Install stable
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
-          target: ${{matrix.target.rust}}
       - name: Install libtinfo
         if: matrix.os == 'ubuntu-latest'
         run: |
-          sudo apt-get update
-          sudo apt-get install libtinfo5
+          wget https://mirrors.kernel.org/ubuntu/pool/universe/n/ncurses/libtinfo5_6.3-2ubuntu0.1_amd64.deb
+          sudo dpkg -i libtinfo5_6.3-2ubuntu0.1_amd64.deb
+      - name: Install LLVM and Clang
+        uses: KyleMayes/install-llvm-action@v2.0.5
+        with:
+          version: ${{matrix.llvm_version}}
       - name: Run all the tests
         env:
           GITHUB_ACTIONS_OS: ${{matrix.os}}
-          RUST_CROSS_COMPILER: ${{matrix.target.cross}}
-          RUST_TARGET: ${{matrix.target.rust}}
-          LLVM_VERSION: ${{matrix.llvm_version}}
-          BINDGEN_MAIN_TESTS: ${{matrix.main_tests}}
           BINDGEN_RELEASE_BUILD: ${{matrix.release_build}}
           BINDGEN_FEATURE_RUNTIME: ${{matrix.feature_runtime}}
           BINDGEN_FEATURE_EXTRA_ASSERTS: ${{matrix.feature_extra_asserts}}
@@ -239,12 +201,27 @@ jobs:
           ./mdbook build book
           ./mdbook test book
 
+  # FIXME(pvdrz): this should be done inside `bindgen-test` instead
+  test-no-headers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Test `--help`
+        run: cargo run -- --help
+
+      - name: Test `--version`
+        run: cargo run -- --version
+
+      - name: Test `--generate-shell-completions`
+        run: cargo run -- --generate-shell-completions=bash
+
   # One job that "summarizes" the success state of this pipeline. This can then
   # be added to branch protection, rather than having to add each job
   # separately.
   success:
     runs-on: ubuntu-latest
-    needs: [rustfmt-clippy, msrv, minimal, docs, quickchecking, test-expectations, test, check-cfg, test-book]
+    needs: [rustfmt-clippy, msrv, minimal, docs, quickchecking, test-expectations, test, check-cfg, test-book, test-no-headers]
     # GitHub branch protection is exceedingly silly and treats "jobs skipped
     # because a dependency failed" as success. So we have to do some
     # contortions to ensure the job fails if any of its dependencies fails.

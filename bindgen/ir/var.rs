@@ -113,11 +113,7 @@ impl DotAttributes for Var {
         }
 
         if let Some(ref mangled) = self.mangled_name {
-            writeln!(
-                out,
-                "<tr><td>mangled name</td><td>{}</td></tr>",
-                mangled
-            )?;
+            writeln!(out, "<tr><td>mangled name</td><td>{mangled}</td></tr>")?;
         }
 
         Ok(())
@@ -129,31 +125,32 @@ fn default_macro_constant_type(ctx: &BindgenContext, value: i64) -> IntKind {
         ctx.options().default_macro_constant_type ==
             MacroTypeVariation::Signed
     {
-        if value < i32::MIN as i64 || value > i32::MAX as i64 {
+        if value < i64::from(i32::MIN) || value > i64::from(i32::MAX) {
             IntKind::I64
         } else if !ctx.options().fit_macro_constants ||
-            value < i16::MIN as i64 ||
-            value > i16::MAX as i64
+            value < i64::from(i16::MIN) ||
+            value > i64::from(i16::MAX)
         {
             IntKind::I32
-        } else if value < i8::MIN as i64 || value > i8::MAX as i64 {
+        } else if value < i64::from(i8::MIN) || value > i64::from(i8::MAX) {
             IntKind::I16
         } else {
             IntKind::I8
         }
-    } else if value > u32::MAX as i64 {
+    } else if value > i64::from(u32::MAX) {
         IntKind::U64
-    } else if !ctx.options().fit_macro_constants || value > u16::MAX as i64 {
+    } else if !ctx.options().fit_macro_constants || value > i64::from(u16::MAX)
+    {
         IntKind::U32
-    } else if value > u8::MAX as i64 {
+    } else if value > i64::from(u8::MAX) {
         IntKind::U16
     } else {
         IntKind::U8
     }
 }
 
-/// Parses tokens from a CXCursor_MacroDefinition pointing into a function-like
-/// macro, and calls the func_macro callback.
+/// Parses tokens from a `CXCursor_MacroDefinition` pointing into a function-like
+/// macro, and calls the `func_macro` callback.
 fn handle_function_macro(
     cursor: &clang::Cursor,
     callbacks: &dyn crate::callbacks::ParseCallbacks,
@@ -202,9 +199,8 @@ impl ClangSubItemParser for Var {
 
                 let value = parse_macro(ctx, &cursor);
 
-                let (id, value) = match value {
-                    Some(v) => v,
-                    None => return Err(ParseError::Continue),
+                let Some((id, value)) = value else {
+                    return Err(ParseError::Continue);
                 };
 
                 assert!(!id.is_empty(), "Empty macro name?");
@@ -239,7 +235,7 @@ impl ClangSubItemParser for Var {
                                 c as u8
                             }
                             CChar::Raw(c) => {
-                                assert!(c <= u8::MAX as u64);
+                                assert!(c <= u64::from(u8::MAX));
                                 c as u8
                             }
                         };
@@ -311,7 +307,7 @@ impl ClangSubItemParser for Var {
                     ([CXType_ConstantArray, CXType_IncompleteArray]
                         .contains(&ty.kind()) &&
                         ty.elem_type()
-                            .map_or(false, |element| element.is_const()));
+                            .is_some_and(|element| element.is_const()));
 
                 let ty = match Item::from_ty(&ty, cursor, None, ctx) {
                     Ok(ty) => ty,
@@ -320,8 +316,7 @@ impl ClangSubItemParser for Var {
                             matches!(ty.kind(), CXType_Auto | CXType_Unexposed),
                             "Couldn't resolve constant type, and it \
                              wasn't an nondeductible auto type or unexposed \
-                             type: {:?}",
-                            ty
+                             type: {ty:?}"
                         );
                         return Err(e);
                     }
@@ -335,17 +330,17 @@ impl ClangSubItemParser for Var {
                     .safe_resolve_type(ty)
                     .and_then(|t| t.safe_canonical_type(ctx));
 
-                let is_integer = canonical_ty.map_or(false, |t| t.is_integer());
-                let is_float = canonical_ty.map_or(false, |t| t.is_float());
+                let is_integer = canonical_ty.is_some_and(|t| t.is_integer());
+                let is_float = canonical_ty.is_some_and(|t| t.is_float());
 
                 // TODO: We could handle `char` more gracefully.
                 // TODO: Strings, though the lookup is a bit more hard (we need
                 // to look at the canonical type of the pointee too, and check
                 // is char, u8, or i8 I guess).
                 let value = if is_integer {
-                    let kind = match *canonical_ty.unwrap().kind() {
-                        TypeKind::Int(kind) => kind,
-                        _ => unreachable!(),
+                    let TypeKind::Int(kind) = *canonical_ty.unwrap().kind()
+                    else {
+                        unreachable!()
                     };
 
                     let mut val = cursor.evaluate().and_then(|v| v.as_int());
@@ -404,7 +399,7 @@ fn parse_macro_clang_fallback(
     }
 
     let ftu = ctx.try_ensure_fallback_translation_unit()?;
-    let contents = format!("int main() {{ {}; }}", cursor.spelling(),);
+    let contents = format!("int main() {{ {}; }}", cursor.spelling());
     ftu.reparse(&contents).ok()?;
     // Children of root node of AST
     let root_children = ftu.translation_unit().cursor().collect_children();
@@ -482,10 +477,10 @@ fn get_integer_literal_from_cursor(cursor: &clang::Cursor) -> Option<i64> {
 
 fn duplicated_macro_diagnostic(
     macro_name: &str,
-    _location: crate::clang::SourceLocation,
+    _location: clang::SourceLocation,
     _ctx: &BindgenContext,
 ) {
-    warn!("Duplicated macro definition: {}", macro_name);
+    warn!("Duplicated macro definition: {macro_name}");
 
     #[cfg(feature = "experimental")]
     // FIXME (pvdrz & amanjeev): This diagnostic message shows way too often to be actually

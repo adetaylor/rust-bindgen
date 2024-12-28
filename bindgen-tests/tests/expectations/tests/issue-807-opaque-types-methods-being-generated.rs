@@ -40,12 +40,12 @@ const _: () = {
     ["Size of Opaque"][::std::mem::size_of::<Opaque>() - 1usize];
     ["Alignment of Opaque"][::std::mem::align_of::<Opaque>() - 1usize];
 };
-extern "C" {
+unsafe extern "C" {
     #[bindgen_original_name("eleven_out_of_ten")]
     #[link_name = "\u{1}_ZN6Opaque17eleven_out_of_tenEv"]
     pub fn Opaque_eleven_out_of_ten(this: *mut Opaque) -> SuchWow;
 }
-extern "C" {
+unsafe extern "C" {
     #[bindgen_original_name("Opaque")]
     #[link_name = "\u{1}_ZN6OpaqueC1E6Pupper"]
     pub fn Opaque_Opaque(this: *mut Opaque, pup: Pupper);
@@ -62,7 +62,7 @@ impl Opaque {
         __bindgen_tmp.assume_init()
     }
 }
-extern "C" {
+unsafe extern "C" {
     #[link_name = "\u{1}_ZN6Opaque11MAJESTIC_AFE"]
     pub static mut Opaque_MAJESTIC_AF: Doggo;
 }

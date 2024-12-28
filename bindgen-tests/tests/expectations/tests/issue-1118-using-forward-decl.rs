@@ -59,7 +59,7 @@ impl Default for nsIContent {
         }
     }
 }
-extern "C" {
+unsafe extern "C" {
     #[bindgen_unused_template_param_in_arg_or_return]
     #[link_name = "\u{1}_Z35Gecko_GetAnonymousContentForElementv"]
     pub fn Gecko_GetAnonymousContentForElement() -> *mut nsTArray;
