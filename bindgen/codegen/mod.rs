@@ -27,7 +27,6 @@ use crate::callbacks::{
 use crate::codegen::error::Error;
 use crate::codegen::helpers::{
     CppSemanticAttributeAdder, CppSemanticAttributeCreator,
-    CppSemanticAttributeSingle,
 };
 use crate::ir::analysis::{HasVtable, Sizedness};
 use crate::ir::annotations::{
@@ -449,7 +448,7 @@ impl WithImplicitTemplateParams for syn::Type {
             TypeKind::ObjCSel |
             TypeKind::TemplateInstantiation(..) => None,
             _ => {
-                let (params, _) = item.used_template_params(ctx);
+                let params = item.all_template_params(ctx);
                 if params.is_empty() {
                     None
                 } else {
@@ -971,13 +970,9 @@ impl CodeGenerator for Type {
                     return;
                 }
 
-                let (mut outer_params, has_unused_template_args) =
-                    item.used_template_params(ctx);
-
                 let is_opaque = item.is_opaque(ctx, &());
-                let inner_rust_type = if is_opaque {
-                    outer_params = vec![];
-                    self.to_opaque(ctx, item)
+                let (inner_rust_type, outer_params) = if is_opaque {
+                    (self.to_opaque(ctx, item), vec![])
                 } else {
                     // Its possible that we have better layout information than
                     // the inner type does, so fall back to an opaque blob based
@@ -988,8 +983,10 @@ impl CodeGenerator for Type {
                         .unwrap_or_else(|_| {
                             (self.to_opaque(ctx, item), RustTyAnnotation::None)
                         });
-                    inner_ty
-                        .with_implicit_template_params(ctx, inner_item)
+                    (inner_ty
+                        .with_implicit_template_params(ctx, inner_item),
+                        inner_item.all_template_params(ctx)
+                    )
                 };
 
                 {
@@ -1034,18 +1031,6 @@ impl CodeGenerator for Type {
                 } else {
                     quote! {}
                 };
-                let mut semantic_annotations =
-                    CppSemanticAttributeSingle::new(ctx.options());
-                // We are handling (essentially) type X = Y;
-                // We want to denote only if X has unused template params, e.g.
-                // type X<A> = Y;
-                // We don't want to note whether Y has unused template params, e.g.
-                // type X = Y<B>
-                // because that information will be recorded against the definition of Y.
-                if has_unused_template_args {
-                    semantic_annotations.discards_template_param();
-                }
-                tokens.append_all(semantic_annotations.result());
 
                 let alias_style = if ctx.options().type_alias.matches(&name) {
                     AliasVariation::TypeAlias
@@ -2231,14 +2216,16 @@ impl CodeGenerator for CompInfo {
 
         let mut generic_param_names = vec![];
 
-        let (used_template_params, unused_template_params) =
-            item.used_template_params(ctx);
-        for (idx, ty) in used_template_params.iter().enumerate() {
+        let template_params_for_which_we_need_phantom_data = if is_opaque {
+            item.used_template_params(ctx).0
+        } else {
+            item.all_template_params(ctx)
+        };
+        for (idx, ty) in template_params_for_which_we_need_phantom_data.iter().enumerate() {
             let param = ctx.resolve_type(*ty);
             let name = param.name().unwrap();
             let ident = ctx.rust_ident(name);
             generic_param_names.push(ident.clone());
-
             let prefix = ctx.trait_prefix();
             let field_name = ctx.rust_ident(format!("_phantom_{idx}"));
             fields.push(quote! {
@@ -2504,9 +2491,6 @@ impl CodeGenerator for CompInfo {
         }
         let mut semantic_annotations =
             CppSemanticAttributeAdder::new(ctx.options(), &mut attributes);
-        if unused_template_params {
-            semantic_annotations.discards_template_param();
-        }
         semantic_annotations.visibility(self.visibility());
         if let Some(layout) = layout {
             semantic_annotations.layout(&layout);
@@ -4683,7 +4667,7 @@ impl TryToRustTy for TemplateInstantiation {
             .zip(def_params.iter())
             // Only pass type arguments for the type parameters that
             // the def uses.
-            .filter(|&(_, param)| ctx.uses_template_parameter(def.id(), *param))
+            // .filter(|&(_, param)| ctx.uses_template_parameter(def.id(), *param))
             .map(|(arg, _)| {
                 let arg = arg.into_resolver().through_type_refs().resolve(ctx);
                 let ty = arg

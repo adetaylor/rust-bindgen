@@ -164,10 +164,6 @@ pub(crate) trait CppSemanticAttributeCreator {
         self.add_ident("incomprehensible_param_in_arg_or_return")
     }
 
-    fn discards_template_param(&mut self) {
-        self.add_ident("unused_template_param")
-    }
-
     fn deleted_fn(&mut self) {
         self.add_ident("deleted")
     }
