@@ -983,9 +983,16 @@ impl CodeGenerator for Type {
                         .unwrap_or_else(|_| {
                             (self.to_opaque(ctx, item), RustTyAnnotation::None)
                         });
+                    // If we use item.used_template_params here, it works for
+                    //  pub type remove_reference_type<_Ty> = _Ty;
+                    // but doesn't work for
+                    //  pub type bj = root::a::ac::bh<type_parameter_0_0, type_parameter_0_2>;
+                    // If we use inner_item.all_template_params, it works for the latter
+                    // but not the former.
                     (inner_ty
                         .with_implicit_template_params(ctx, inner_item),
-                        inner_item.all_template_params(ctx)
+                        // inner_item.all_template_params(ctx)
+                        item.used_template_params(ctx).0
                     )
                 };
 
@@ -4678,16 +4685,16 @@ impl TryToRustTy for TemplateInstantiation {
             })
             .collect::<error::Result<Vec<_>>>()?;
 
-        let has_unused_template_args = def_params
-            .iter()
-            // Only pass type arguments for the type parameters that
-            // the def uses.
-            .any(|param| !ctx.uses_template_parameter(def.id(), *param));
+        // let has_unused_template_args = def_params
+        //     .iter()
+        //     // Only pass type arguments for the type parameters that
+        //     // the def uses.
+        //     .any(|param| !ctx.uses_template_parameter(def.id(), *param));
         Ok(RustTy::with_unused_template_args(if template_args.is_empty() {
             syn::parse_quote! { #ty }
         } else {
             syn::parse_quote! { #ty<#(#template_args),*> }
-        }, has_unused_template_args))
+        }, false))
     }
 }
 
