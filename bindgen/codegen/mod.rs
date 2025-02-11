@@ -918,6 +918,11 @@ impl CodeGenerator for Type {
             }
             TypeKind::Comp(ref ci) => ci.codegen(ctx, result, item),
             TypeKind::TemplateAlias(inner, _) | TypeKind::Alias(inner) => {
+                let outer_template_params = if let TypeKind::TemplateAlias(_, outer_template_params) = self.kind() {
+                    outer_template_params.clone()
+                } else {
+                    Vec::new()
+                };
                 let inner_item =
                     inner.into_resolver().through_type_refs().resolve(ctx);
                 let name = item.canonical_name(ctx);
@@ -983,16 +988,25 @@ impl CodeGenerator for Type {
                         .unwrap_or_else(|_| {
                             (self.to_opaque(ctx, item), RustTyAnnotation::None)
                         });
+                    // We're emitting a typedef e.g. pub type A<B> = C<D,E>;
+                    // Here we're determining the list of type params B.
                     // If we use item.used_template_params here, it works for
                     //  pub type remove_reference_type<_Ty> = _Ty;
                     // but doesn't work for
                     //  pub type bj = root::a::ac::bh<type_parameter_0_0, type_parameter_0_2>;
                     // If we use inner_item.all_template_params, it works for the latter
                     // but not the former.
+                    // Hence, we filter to all the params to include only
+                    // those which are template params from our outer type.
+                    eprintln!("Name {name}: outer params are {:?}, inner params are {:?}", outer_template_params, item.all_template_params(ctx));
+                    let non_type_param_params: Vec<_> = item.all_template_params(ctx)
+                                                            .into_iter()
+                                                            .filter(|param| param.is_template_param(ctx, &()) && outer_template_params.contains(param))
+                                                            .collect();
+                    eprintln!("Name {name}: concluded {:?}", non_type_param_params);
                     (inner_ty
                         .with_implicit_template_params(ctx, inner_item),
-                        // inner_item.all_template_params(ctx)
-                        item.used_template_params(ctx).0
+                        non_type_param_params
                     )
                 };
 
