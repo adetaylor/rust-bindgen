@@ -11,7 +11,6 @@ pub mod root {
         pub struct Rooted {
             pub _address: u8,
         }
-        #[bindgen_original_name("Rooted::ElementType")]
         pub type Rooted_ElementType<T> = T;
     }
     #[repr(C)]

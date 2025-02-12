@@ -7,9 +7,6 @@ pub struct UsesTemplateParameter<T> {
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-#[bindgen_original_name(
-    "UsesTemplateParameter::AlsoUsesTemplateParameterAndMore"
-)]
 pub struct UsesTemplateParameter_AlsoUsesTemplateParameterAndMore<T, U> {
     pub _phantom_0: ::std::marker::PhantomData<::std::cell::UnsafeCell<T>>,
     pub _phantom_1: ::std::marker::PhantomData<::std::cell::UnsafeCell<U>>,

@@ -7,9 +7,7 @@ pub struct IndirectUsage<T, U> {
     pub member1: IndirectUsage_Typedefed<T>,
     pub member2: IndirectUsage_Aliased<U>,
 }
-#[bindgen_original_name("IndirectUsage::Typedefed")]
 pub type IndirectUsage_Typedefed<T> = T;
-#[bindgen_original_name("IndirectUsage::Aliased")]
 pub type IndirectUsage_Aliased<U> = U;
 impl<T, U> Default for IndirectUsage<T, U> {
     fn default() -> Self {

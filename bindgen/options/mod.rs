@@ -168,19 +168,6 @@ options! {
         as_args: "--use-specific-virtual-function-receiver",
     },
 
-    /// Whether we should emit C++ semantics attributes.
-    cpp_semantic_attributes: bool {
-        methods: {
-            /// If this is true, add attributes with details of underlying C++ semantics.
-            /// Disabled by default.
-            pub fn cpp_semantic_attributes(mut self, doit: bool) -> Builder {
-                self.options.cpp_semantic_attributes = doit;
-                self
-            }
-        },
-        as_args: "--cpp-semantic-attributes",
-    },
-
     /// Whether we should output information about C++ overloaded operators.
     represent_cxx_operators: bool {
         methods: {
@@ -207,6 +194,79 @@ options! {
         },
         as_args: "--use-distinct-char16-t",
     },
+
+    /// Use a newtype wrapper to clearly denote "opaque" types; that is,
+    /// types where bindgen has generated a type matching the size and
+    /// alignment of the C++ type but without any knowledge of what's
+    /// inside it. The newtype wrapper will be a fake type called
+    /// `bindgen_marker_Opaque`. It's assumed that you will replace this with some
+    /// real sensible newtype wrapper of your own, either by post-processing
+    /// the output of bindgen, or by using a `use` statemet injected using
+    /// `--module-raw-lines` or similar.
+    use_opaque_newtype_wrapper: bool {
+        methods: {
+            /// If this is true, wrap opaque types in a fake newtype
+            /// wrapper which post-processors can replace with something
+            /// more sensible.
+            pub fn use_opaque_newtype_wrapper(mut self, doit: bool) -> Builder {
+                self.options.use_opaque_newtype_wrapper = doit;
+                self
+            }
+        },
+        as_args: "--use-opaque-newtype-wrapper",
+    },
+
+    /// Use a newtype wrapper to clearly denote C++ reference types.
+    /// These are always generated as raw Rust pointers, and so otherwise
+    /// there's no way to distinguish references from pointers.
+    /// The newtype wrapper will be a fake type either called
+    /// `bindgen_marker_Reference` or `bindgen_marker_RVAlueReference`.
+    /// It's assumed that you will replace this with some
+    /// real sensible newtype wrapper of your own, either by post-processing
+    /// the output of bindgen, or by using a `use` statemet injected using
+    /// `--module-raw-lines` or similar.
+    use_reference_newtype_wrapper: bool {
+        methods: {
+            /// If this is true, wrap C++ references in a fake newtype
+            /// wrapper which post-processors can replace with something
+            /// more sensible.
+            pub fn use_reference_newtype_wrapper(mut self, doit: bool) -> Builder {
+                self.options.use_reference_newtype_wrapper = doit;
+                self
+            }
+        },
+        as_args: "--use-reference-newtype-wrapper",
+    },
+
+    /// Use a newtype wrapper to denote types with "missing" C++ template
+    /// arguments. Sometimes bindgen is unable to see the purpose of
+    /// a given template argument, because it doesn't translate to
+    /// a real purpose in the generated Rust code (e.g. for SFINAE type
+    /// tricks for compile-time evaluation on the C++ side). Bindgen
+    /// thus omits these template parameters. But this can cause problems
+    /// for postprocessors which expect to see all template parameters;
+    /// when this option is enabled we denote these types using a newtype
+    /// wrapper.
+    /// The newtype wrapper will be a fake type called
+    /// `bindgen_marker_MissingTemplateParam`.
+    /// It's assumed that you will replace this with some
+    /// real sensible newtype wrapper of your own, either by post-processing
+    /// the output of bindgen, or by using a `use` statemet injected using
+    /// `--module-raw-lines` or similar.
+    use_unused_template_param_newtype_wrapper: bool {
+        methods: {
+            /// If this is true, wrap types that don't have a complete set
+            /// of template parameters in a fake newtype
+            /// wrapper which post-processors can replace with something
+            /// more sensible.
+            pub fn use_unused_template_param_newtype_wrapper(mut self, doit: bool) -> Builder {
+                self.options.use_unused_template_param_newtype_wrapper = doit;
+                self
+            }
+        },
+        as_args: "--use-unused-template-param-newtype-wrapper",
+    },
+
 
     /// Types that have been blocklisted and should not appear anywhere in the generated code.
     blocklisted_types: RegexSet {
@@ -2221,4 +2281,52 @@ options! {
         },
         as_args: "--clang-macro-fallback-build-dir",
     }
+    /// Whether to always report C++ "deleted" functions.
+    generate_deleted_functions: bool {
+        methods: {
+            /// Set whether to generate C++ functions even marked "=deleted"
+            ///
+            /// Although not useful to call these functions, downstream code
+            /// generators may need to know whether they've been deleted in
+            /// order to determine the relocatability of a C++ type.
+            pub fn generate_deleted_functions(mut self, doit: bool) -> Self {
+                self.options.generate_deleted_functions = doit;
+                self
+            }
+
+        },
+        as_args: "--respect-cxx-access-specs",
+    },
+    /// Whether to always report C++ "pure virtual" functions.
+    generate_pure_virtuals: bool {
+        methods: {
+            /// Set whether to generate C++ functions that are pure virtual.
+            ///
+            /// These functions can't be called, so the only reason
+            /// to generate them is if downstream postprocessors
+            /// need to know of their existence.
+            pub fn generate_pure_virtuals(mut self, doit: bool) -> Self {
+                self.options.generate_pure_virtuals = doit;
+                self
+            }
+
+        },
+        as_args: "--generate-pure-virtuals",
+    },
+    /// Whether to always report C++ "private" functions.
+    generate_private_functions: bool {
+        methods: {
+            /// Set whether to generate C++ functions that are private.
+            ///
+            /// These functions can't be called, so the only reason
+            /// to generate them is if downstream postprocessors
+            /// need to know of their existence.
+            pub fn generate_private_functions(mut self, doit: bool) -> Self {
+                self.options.generate_private_functions = doit;
+                self
+            }
+
+        },
+        as_args: "--generate-private-functions",
+    },
 }

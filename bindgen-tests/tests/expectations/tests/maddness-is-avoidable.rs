@@ -6,7 +6,6 @@ pub struct RefPtr {
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
-#[bindgen_original_name("RefPtr::Proxy")]
 pub struct RefPtr_Proxy {
     pub _address: u8,
 }

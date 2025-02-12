@@ -4,13 +4,10 @@
 pub struct DoesNotUse {
     pub _address: u8,
 }
-#[bindgen_original_name("DoesNotUse::Aliased")]
 pub type DoesNotUse_Aliased<T> = T;
-#[bindgen_original_name("DoesNotUse::Typedefed")]
 pub type DoesNotUse_Typedefed<U> = U;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-#[bindgen_original_name("DoesNotUse::IndirectUsage")]
 pub struct DoesNotUse_IndirectUsage<T, U> {
     pub _phantom_0: ::std::marker::PhantomData<::std::cell::UnsafeCell<T>>,
     pub _phantom_1: ::std::marker::PhantomData<::std::cell::UnsafeCell<U>>,

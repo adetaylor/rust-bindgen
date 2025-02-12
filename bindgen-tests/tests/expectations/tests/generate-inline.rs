@@ -10,7 +10,6 @@ const _: () = {
     ["Alignment of Foo"][::std::mem::align_of::<Foo>() - 1usize];
 };
 unsafe extern "C" {
-    #[bindgen_original_name("bar")]
     #[link_name = "\u{1}_ZN3Foo3barEv"]
     pub fn Foo_bar() -> ::std::os::raw::c_int;
 }

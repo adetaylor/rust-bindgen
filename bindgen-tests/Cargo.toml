@@ -8,7 +8,7 @@ rust-version.workspace = true
 edition.workspace = true
 
 [dev-dependencies]
-bindgen = { workspace = true, default-features = true, features = ["__cli", "experimental"] }
+autocxx-bindgen = { workspace = true, default-features = true, features = ["__cli", "experimental"] }
 owo-colors.workspace = true
 prettyplease = { workspace = true, features = ["verbatim"] }
 proc-macro2.workspace = true
@@ -19,10 +19,10 @@ syn.workspace = true
 tempfile.workspace = true
 
 [features]
-logging = ["bindgen/logging"]
-static = ["bindgen/static"]
-runtime = ["bindgen/runtime"]
+logging = ["autocxx-bindgen/logging"]
+static = ["autocxx-bindgen/static"]
+runtime = ["autocxx-bindgen/runtime"]
 
-__testing_only_extra_assertions = ["bindgen/__testing_only_extra_assertions"]
-__testing_only_libclang_9 = ["bindgen/__testing_only_libclang_9"]
-__testing_only_libclang_16 = ["bindgen/__testing_only_libclang_16"]
+__testing_only_extra_assertions = ["autocxx-bindgen/__testing_only_extra_assertions"]
+__testing_only_libclang_9 = ["autocxx-bindgen/__testing_only_libclang_9"]
+__testing_only_libclang_16 = ["autocxx-bindgen/__testing_only_libclang_16"]

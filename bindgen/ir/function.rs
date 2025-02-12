@@ -72,11 +72,14 @@ pub(crate) enum Linkage {
     Internal,
 }
 
-/// Visibility
+/// C++ visibility.
 #[derive(Debug, Clone, Copy)]
 pub enum Visibility {
+    /// `public` visibility.
     Public,
+    /// `protected` visibility.
     Protected,
+    /// `private` visibility.
     Private,
 }
 
@@ -524,6 +527,15 @@ impl FunctionSig {
 
         let spelling = cursor.spelling();
 
+        // Don't parse operatorxx functions in C++
+        let is_operator = |spelling: &str| {
+            spelling.starts_with("operator") &&
+                !clang::is_valid_identifier(spelling)
+        };
+        if is_operator(&spelling) && !ctx.options().represent_cxx_operators {
+            return Err(ParseError::Continue);
+        }
+
         // Constructors of non-type template parameter classes for some reason
         // include the template parameter in their name. Just skip them, since
         // we don't handle well non-type template parameters anyway.
@@ -821,6 +833,9 @@ impl ClangSubItemParser for Function {
         if visibility != CXVisibility_Default {
             return Err(ParseError::Continue);
         }
+        if cursor.access_specifier() == CX_CXXPrivate && !context.options().generate_private_functions {
+            return Err(ParseError::Continue);
+        }
 
         let visibility = Visibility::from(cursor.access_specifier());
 
@@ -837,6 +852,10 @@ impl ClangSubItemParser for Function {
             if !context.options().generate_inline_functions &&
                 !context.options().wrap_static_fns
             {
+                return Err(ParseError::Continue);
+            }
+
+            if cursor.is_deleted_function() && !context.options().generate_deleted_functions {
                 return Err(ParseError::Continue);
             }
 
@@ -883,14 +902,18 @@ impl ClangSubItemParser for Function {
             // We can't represent operatorxx functions as-is because
             // they are not valid identifiers
             if context.options().represent_cxx_operators {
-                let (new_suffix, special_member) = match operator_suffix {
-                    "=" => ("equals", SpecialMemberKind::AssignmentOperator),
+                let (new_name, special_member) = match operator_suffix {
+                    "=" => ("operator_equals", Some(SpecialMemberKind::AssignmentOperator)),
+                    _ if clang::is_valid_identifier(&name) => (name.as_str(), None),
                     _ => return Err(ParseError::Continue),
                 };
-                name = format!("operator_{}", new_suffix);
-                Some(special_member)
+                name = new_name.to_string();
+                special_member
             } else {
-                return Err(ParseError::Continue);
+                // Without 'represent_cxx_operators' enabled, we will have already rejected
+                // troublesomely-named operators; any left over from this point are
+                // something like operator_information and are thus harmless.
+                None
             }
         } else {
             None

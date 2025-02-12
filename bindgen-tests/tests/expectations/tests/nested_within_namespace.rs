@@ -13,7 +13,6 @@ pub mod root {
         }
         #[repr(C)]
         #[derive(Debug, Default, Copy, Clone)]
-        #[bindgen_original_name("Bar::Baz")]
         pub struct Bar_Baz {
             pub foo: ::std::os::raw::c_int,
         }

@@ -4,7 +4,6 @@ unsafe extern "C" {
     pub fn my_function(a: ::std::os::raw::c_int);
 }
 unsafe extern "C" {
-    #[bindgen_original_name("my_function")]
     #[link_name = "\u{1}_Z11my_functionPKc"]
     pub fn my_function1(a: *const ::std::os::raw::c_char);
 }

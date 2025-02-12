@@ -10,7 +10,6 @@ const _: () = {
     ["Alignment of Foo"][::std::mem::align_of::<Foo>() - 1usize];
 };
 unsafe extern "C" {
-    #[bindgen_original_name("type")]
     #[link_name = "\u{1}_ZN3Foo4typeEv"]
     pub fn Foo_type(this: *mut Foo) -> ::std::os::raw::c_int;
 }

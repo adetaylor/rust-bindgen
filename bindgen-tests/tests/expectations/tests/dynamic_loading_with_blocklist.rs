@@ -11,17 +11,14 @@ const _: () = {
     ["Offset of field: X::_x"][::std::mem::offset_of!(X, _x) - 0usize];
 };
 unsafe extern "C" {
-    #[bindgen_original_name("some_function")]
     #[link_name = "\u{1}_ZN1X13some_functionEv"]
     pub fn X_some_function(this: *mut X);
 }
 unsafe extern "C" {
-    #[bindgen_original_name("some_other_function")]
     #[link_name = "\u{1}_ZN1X19some_other_functionEv"]
     pub fn X_some_other_function(this: *mut X);
 }
 unsafe extern "C" {
-    #[bindgen_original_name("X")]
     #[link_name = "\u{1}_ZN1XC1Ei"]
     pub fn X_X(this: *mut X, x: ::std::os::raw::c_int);
 }

@@ -1,6 +1,5 @@
 #![allow(unused_qualifications)] // Clap somehow generates a lot of these
 
-use autocxx_bindgen as bindgen;
 use crate::{
     builder,
     callbacks::{
@@ -253,7 +252,7 @@ struct BindgenCommand {
     /// Avoid including doc comments in the output, see: <https://github.com/rust-lang/rust-bindgen/issues/426>
     #[arg(long)]
     no_doc_comments: bool,
-    /// Disable allowlisting types recursively. This will cause bindgen to emit Rust code that won't compile! See the `bindgen::Builder::allowlist_recursively` method's documentation for details.
+    /// Disable allowlisting types recursively. This will cause bindgen to emit Rust code that won't compile! See the `autocxx_bindgen::Builder::allowlist_recursively` method's documentation for details.
     #[arg(long)]
     no_recursive_allowlist: bool,
     /// Use extern crate instead of use for objc.
@@ -448,10 +447,6 @@ struct BindgenCommand {
     /// Output C++ overloaded operators
     #[arg(long)]
     represent_cxx_operators: bool,
-    /// Output additional attributes denoting the intende semantics of each C++ function and type.
-    /// Useful for downstream code generators.
-    #[arg(long)]
-    cpp_semantic_attributes: bool,
     /// Use distinct char16_t
     #[arg(long)]
     use_distinct_char16_t: bool,
@@ -645,7 +640,6 @@ where
         explicit_padding,
         use_specific_virtual_function_receiver,
         represent_cxx_operators,
-        cpp_semantic_attributes,
         use_distinct_char16_t,
         vtable_generation,
         sort_semantically,
@@ -944,6 +938,9 @@ where
             translate_enum_integer_types,
             c_naming,
             explicit_padding,
+            use_specific_virtual_function_receiver,
+            represent_cxx_operators,
+            use_distinct_char16_t,
             vtable_generation,
             sort_semantically,
             merge_extern_blocks,

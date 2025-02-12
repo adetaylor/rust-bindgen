@@ -5,11 +5,8 @@ pub type foo = ::std::option::Option<unsafe extern "C" fn(arg1: ::std::os::raw::
 pub struct Foo {
     pub _address: u8,
 }
-#[bindgen_original_name("Foo::Char")]
 pub type Foo_Char<T> = T;
-#[bindgen_original_name("Foo::FooPtrTypedef")]
 pub type Foo_FooPtrTypedef<T> = *mut Foo_Char<T>;
-#[bindgen_original_name("Foo::nsCOMArrayEnumFunc")]
 pub type Foo_nsCOMArrayEnumFunc<T> = ::std::option::Option<
     unsafe extern "C" fn(aElement: *mut T, aData: *mut ::std::os::raw::c_void) -> bool,
 >;

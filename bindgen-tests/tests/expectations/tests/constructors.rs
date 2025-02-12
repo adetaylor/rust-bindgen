@@ -10,7 +10,6 @@ const _: () = {
     ["Alignment of TestOverload"][::std::mem::align_of::<TestOverload>() - 1usize];
 };
 unsafe extern "C" {
-    #[bindgen_original_name("TestOverload")]
     #[link_name = "\u{1}_ZN12TestOverloadC1Ei"]
     pub fn TestOverload_TestOverload(
         this: *mut TestOverload,
@@ -18,7 +17,6 @@ unsafe extern "C" {
     );
 }
 unsafe extern "C" {
-    #[bindgen_original_name("TestOverload")]
     #[link_name = "\u{1}_ZN12TestOverloadC1Ed"]
     pub fn TestOverload_TestOverload1(this: *mut TestOverload, arg1: f64);
 }
@@ -49,8 +47,6 @@ const _: () = {
     ][::std::mem::align_of::<TestPublicNoArgs>() - 1usize];
 };
 unsafe extern "C" {
-    #[bindgen_original_name("TestPublicNoArgs")]
-    #[bindgen_special_member("default_ctor")]
     #[link_name = "\u{1}_ZN16TestPublicNoArgsC1Ev"]
     pub fn TestPublicNoArgs_TestPublicNoArgs(this: *mut TestPublicNoArgs);
 }
