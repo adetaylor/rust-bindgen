@@ -74,15 +74,20 @@ impl MethodKind {
     }
 }
 
-// The kind of C++ special member.
+/// The kind of C++ special member.
 // TODO: We don't currently cover copy assignment or move assignment operator
 // because libclang doesn't provide a way to query for them.
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum SpecialMemberKind {
+    /// The default constructor.
     DefaultConstructor,
+    /// A copy constructor.
     CopyConstructor,
+    /// A move constructor.
     MoveConstructor,
+    /// A destructor.
     Destructor,
+    /// The assignment operator.
     AssignmentOperator,
 }
 

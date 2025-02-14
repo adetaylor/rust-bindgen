@@ -25,8 +25,6 @@ impl Default for PackedVtable {
     }
 }
 extern "C" {
-    #[bindgen_original_name("PackedVtable_destructor")]
-    #[bindgen_special_member("dtor")]
     #[link_name = "\u{1}_ZN12PackedVtableD1Ev"]
     pub fn PackedVtable_PackedVtable_destructor(this: *mut PackedVtable);
 }

@@ -15,8 +15,6 @@ const _: () = {
     ["Alignment of Bar"][::std::mem::align_of::<Bar>() - 1usize];
 };
 unsafe extern "C" {
-    #[bindgen_original_name("Bar")]
-    #[bindgen_special_member("default_ctor")]
     #[link_name = "\u{1}_ZN3BarC1Ev"]
     pub fn Bar_Bar(this: *mut Bar);
 }

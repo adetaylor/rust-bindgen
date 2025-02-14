@@ -16,5 +16,4 @@ impl<T, V> Default for DoesNotUseU<T, V> {
         }
     }
 }
-#[bindgen_unused_template_param]
 pub type Alias = DoesNotUseU<::std::os::raw::c_int, ::std::os::raw::c_char>;

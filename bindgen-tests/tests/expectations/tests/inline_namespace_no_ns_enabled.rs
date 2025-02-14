@@ -1,7 +1,6 @@
 #![allow(dead_code, non_snake_case, non_camel_case_types, non_upper_case_globals)]
 #[repr(C)]
 #[derive(Debug)]
-#[bindgen_original_name("basic_string")]
 pub struct std_basic_string<CharT> {
     pub _phantom_0: ::std::marker::PhantomData<::std::cell::UnsafeCell<CharT>>,
     pub hider: std_basic_string_Alloc_hider,
@@ -10,7 +9,6 @@ pub struct std_basic_string<CharT> {
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-#[bindgen_original_name("basic_string::Alloc_hider")]
 pub struct std_basic_string_Alloc_hider {
     pub storage: *mut ::std::os::raw::c_void,
 }

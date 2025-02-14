@@ -5,7 +5,6 @@ pub struct Nice {
     pub pointer: Nice_Function,
     pub large_array: [::std::os::raw::c_int; 34usize],
 }
-#[bindgen_original_name("Nice::Function")]
 pub type Nice_Function = ::std::option::Option<
     unsafe extern "C" fn(data: ::std::os::raw::c_int),
 >;

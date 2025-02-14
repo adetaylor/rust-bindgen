@@ -1,7 +1,6 @@
 #![allow(dead_code, non_snake_case, non_camel_case_types, non_upper_case_globals)]
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, Hash, PartialEq, Eq)]
-#[bindgen_original_name("FragmentOrURL")]
 pub struct mozilla_FragmentOrURL {
     pub mIsLocalRef: bool,
 }
@@ -19,7 +18,6 @@ const _: () = {
 };
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, Hash, PartialEq, Eq)]
-#[bindgen_original_name("Position")]
 pub struct mozilla_Position {
     pub _address: u8,
 }
@@ -31,7 +29,6 @@ const _: () = {
     ][::std::mem::align_of::<mozilla_Position>() - 1usize];
 };
 #[repr(C)]
-#[bindgen_original_name("StyleShapeSource")]
 pub struct mozilla_StyleShapeSource {
     pub __bindgen_anon_1: mozilla_StyleShapeSource__bindgen_ty_1,
 }

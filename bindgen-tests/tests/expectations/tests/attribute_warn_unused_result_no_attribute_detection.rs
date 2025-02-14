@@ -10,7 +10,6 @@ fn bindgen_test_layout_Foo() {
     assert_eq!(::std::mem::align_of::<Foo>(), 1usize, "Alignment of Foo");
 }
 extern "C" {
-    #[bindgen_original_name("foo")]
     #[link_name = "\u{1}_ZN3Foo3fooEi"]
     pub fn Foo_foo(this: *mut Foo, arg1: ::std::os::raw::c_int) -> ::std::os::raw::c_int;
 }

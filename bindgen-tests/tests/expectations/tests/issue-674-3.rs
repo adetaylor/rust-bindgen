@@ -8,7 +8,6 @@ pub mod root {
     pub struct nsRefPtrHashtable {
         pub _address: u8,
     }
-    #[bindgen_original_name("nsRefPtrHashtable::UserDataType")]
     pub type nsRefPtrHashtable_UserDataType<PtrType> = *mut PtrType;
     #[repr(C)]
     #[derive(Debug, Default, Copy, Clone)]

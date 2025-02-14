@@ -4,6 +4,7 @@ use std::rc::Rc;
 
 use regex::Regex;
 
+use autocxx_bindgen as bindgen;
 use bindgen::callbacks::{DiscoveredItem, DiscoveredItemId, ParseCallbacks};
 use bindgen::Builder;
 
@@ -58,6 +59,19 @@ pub fn test_item_discovery_callback() {
             DiscoveredItem::Alias {
                 alias_name: "AliasOfNamedUnion".to_string(),
                 alias_for: DiscoveredItemId::new(20),
+            },
+        ),
+        (
+            DiscoveredItemId::new(27),
+            DiscoveredItem::Alias {
+                alias_name: "AliasOfNamedEnum".to_string(),
+                alias_for: DiscoveredItemId::new(24),
+            },
+        ),
+        (
+            DiscoveredItemId::new(24),
+            DiscoveredItem::Enum {
+                final_name: "NamedEnum".to_string(),
             },
         ),
         (
@@ -128,6 +142,11 @@ fn compare_item_info(
             expected,
             generated,
         ),
+        DiscoveredItem::Enum { .. } => compare_enum_info(expected_item, generated_item),
+        // DiscoveredItem::Mod { final_name } => todo!(),
+        // DiscoveredItem::Function { final_name } => todo!(),
+        // DiscoveredItem::Method { final_name, parent } => todo!(),
+        _ => true,
     }
 }
 
@@ -203,6 +222,31 @@ pub fn compare_union_info(
         }
         _ => false,
     }
+}
+
+
+pub fn compare_enum_info(
+    expected_item: &DiscoveredItem,
+    generated_item: &DiscoveredItem,
+) -> bool {
+    let DiscoveredItem::Enum {
+        final_name: expected_final_name,
+    } = expected_item
+    else {
+        unreachable!()
+    };
+
+    let DiscoveredItem::Enum {
+        final_name: generated_final_name,
+    } = generated_item
+    else {
+        unreachable!()
+    };
+
+    if !compare_names(expected_final_name, generated_final_name) {
+        return false;
+    }
+    true
 }
 
 pub fn compare_alias_info(

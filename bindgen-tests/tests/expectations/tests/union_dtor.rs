@@ -16,8 +16,6 @@ const _: () = {
     ][::std::mem::offset_of!(UnionWithDtor, mBar) - 0usize];
 };
 unsafe extern "C" {
-    #[bindgen_original_name("UnionWithDtor_destructor")]
-    #[bindgen_special_member("dtor")]
     #[link_name = "\u{1}_ZN13UnionWithDtorD1Ev"]
     pub fn UnionWithDtor_UnionWithDtor_destructor(this: *mut UnionWithDtor);
 }
