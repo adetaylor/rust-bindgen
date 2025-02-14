@@ -7,11 +7,9 @@ pub enum _bindgen_ty_1 {
     ENUM_VARIANT_1 = 0,
     ENUM_VARIANT_2 = 1,
 }
-#[bindgen_original_name("Alias")]
 pub type JS_Alias = u8;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-#[bindgen_original_name("Base")]
 pub struct JS_Base {
     pub f: JS_Alias,
 }
@@ -26,7 +24,6 @@ impl Default for JS_Base {
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-#[bindgen_original_name("AutoIdVector")]
 pub struct JS_AutoIdVector {
     pub _base: JS_Base,
 }

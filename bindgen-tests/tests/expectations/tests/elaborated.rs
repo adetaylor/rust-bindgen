@@ -1,4 +1,4 @@
-#[bindgen_original_name("whatever_t")]
+#![allow(dead_code, non_snake_case, non_camel_case_types, non_upper_case_globals)]
 pub type whatever_whatever_t = ::std::os::raw::c_int;
 unsafe extern "C" {
     #[link_name = "\u{1}_Z9somethingPKi"]

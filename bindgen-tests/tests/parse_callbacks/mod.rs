@@ -1,5 +1,6 @@
 mod item_discovery_callback;
 
+use autocxx_bindgen as bindgen;
 use bindgen::callbacks::*;
 use bindgen::FieldVisibilityKind;
 

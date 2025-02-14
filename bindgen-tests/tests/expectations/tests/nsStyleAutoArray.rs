@@ -22,7 +22,6 @@ pub struct nsStyleAutoArray<T> {
     pub mOtherElements: nsTArray<T>,
 }
 #[repr(i32)]
-#[bindgen_original_name("nsStyleAutoArray::WithSingleInitialElement")]
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
 pub enum nsStyleAutoArray_WithSingleInitialElement {
     WITH_SINGLE_INITIAL_ELEMENT = 0,

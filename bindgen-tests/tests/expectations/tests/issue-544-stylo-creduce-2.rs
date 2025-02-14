@@ -14,9 +14,7 @@ impl<T: Copy + Default, const N: usize> Default for __BindgenOpaqueArray<T, N> {
 pub struct Foo {
     pub member: *mut Foo_SecondAlias,
 }
-#[bindgen_original_name("Foo::FirstAlias")]
 pub type Foo_FirstAlias = __BindgenOpaqueArray<u8, 0usize>;
-#[bindgen_original_name("Foo::SecondAlias")]
 pub type Foo_SecondAlias = Foo;
 impl Default for Foo {
     fn default() -> Self {

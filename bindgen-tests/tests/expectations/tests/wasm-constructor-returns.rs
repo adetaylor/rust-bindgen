@@ -10,7 +10,6 @@ const _: () = {
     ["Alignment of Foo"][::std::mem::align_of::<Foo>() - 1usize];
 };
 unsafe extern "C" {
-    #[bindgen_original_name("Foo")]
     #[link_name = "\u{1}_ZN3FooC1Ei"]
     pub fn Foo_Foo(
         this: *mut Foo,

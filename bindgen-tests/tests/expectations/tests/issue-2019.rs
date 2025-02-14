@@ -32,7 +32,6 @@ const _: () = {
     ["Offset of field: B::b"][::std::mem::offset_of!(B, b) - 0usize];
 };
 unsafe extern "C" {
-    #[bindgen_original_name("make")]
     #[link_name = "\u{1}_ZN1B4makeEv"]
     pub fn make1() -> B;
 }

@@ -1,9 +1,12 @@
 //! A public API for more fine-grained customization of bindgen behavior.
 
 pub use crate::ir::analysis::DeriveTrait;
+pub use crate::ir::comp::SpecialMemberKind;
 pub use crate::ir::derive::CanDerive as ImplementsTrait;
 pub use crate::ir::enum_ty::{EnumVariantCustomBehavior, EnumVariantValue};
+pub use crate::ir::function::Visibility;
 pub use crate::ir::int::IntKind;
+pub use crate::ir::layout::Layout;
 use std::fmt;
 
 /// An enum to allow ignoring parsing of macros.
@@ -166,6 +169,40 @@ pub trait ParseCallbacks: fmt::Debug {
     /// This will get called everytime an item (currently struct, union, and alias) is found with some information about it
     fn new_item_found(&self, _id: DiscoveredItemId, _item: DiscoveredItem) {}
 
+    /// Where the original C++ name differs
+    fn denote_cpp_name(&self, _id: DiscoveredItemId, _original_name: Option<&str>, _namespace_mod: Option<DiscoveredItemId>) {}
+
+    /// Note that a function is a C++ virtual or pure virtual function.
+    fn denote_virtualness(&self, _id: DiscoveredItemId, _virtualness: Virtualness) {}
+
+    /// Note that a C++ function has been marked defaulted or deleted.
+    fn denote_explicit(&self, _id: DiscoveredItemId, _explicitness: Explicitness) {}
+
+    /// Note that a C++ function has been marked defaulted.
+    fn denote_special_member(&self, _id: DiscoveredItemId, _kind: SpecialMemberKind) {}
+
+    /// Note the visibility of a C++ function. Note that this is just reporting
+    /// the C++ visibility; as opposed to [`field_visibility`] this does not
+    /// allow changes.
+    fn denote_visibility(&self, _id: DiscoveredItemId, _visibility: Visibility) {}
+
+    /// Note where in the source code a given item was encountered.
+    fn denote_source_location(&self, _id: DiscoveredItemId, _location: &SourceLocation) {}
+
+    /// Notes the layout of an item.
+    fn denote_layout(&self, _id: DiscoveredItemId, _layout: &Layout) {}
+
+    /// Notes that this type does not use all the template params
+    /// which were present in C++. Sometimes those template parameters
+    /// are not useful in Rust because they don't actually impact the
+    /// data stored in the type, so bindgen drops them. But this also means
+    /// that the bindgen output does not contain full and comprehensive
+    /// output about the original nature of the C++ type, so higher level
+    /// code generators may wish to behave differently. For example,
+    /// it would not be OK to attempt to generate additional C++ code
+    /// based on this.
+    fn denote_discards_template_param(&self, _id: DiscoveredItemId) {}
+
     // TODO add callback for ResolvedTypeRef
 }
 
@@ -217,7 +254,38 @@ pub enum DiscoveredItem {
 
         /// The identifier of the discovered type
         alias_for: DiscoveredItemId,
-    }, // functions, modules, etc.
+    },
+
+    /// Represents an enum.
+    Enum {
+        /// The final name of the generated binding
+        final_name: String,
+    },
+
+    /// A module, typically representing a C++ namespace.
+    Mod {
+        /// The final name used.
+        final_name: String,
+
+        /// The parent ID. Typically another module, indicating that C++
+        /// namespaces are in use. If it's the root module, will be None.
+        parent_id: Option<DiscoveredItemId>,
+    },
+
+    /// A function or method.
+    Function {
+        /// The final name used.
+        final_name: String,
+    },
+
+    /// A method.
+    Method {
+        /// The final name used.
+        final_name: String,
+
+        /// Type to which this method belongs.
+        parent: DiscoveredItemId,
+    }
 }
 
 /// Relevant information about a type to which new derive attributes will be added using
@@ -282,4 +350,45 @@ pub struct FieldInfo<'a> {
     pub field_name: &'a str,
     /// The name of the type of the field.
     pub field_type_name: Option<&'a str>,
+}
+
+/// Whether a method is virtual or pure virtual.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum Virtualness {
+    /// Not pure virtual.
+    Virtual,
+    /// Pure virtual.
+    PureVirtual
+}
+
+/// Whether a field is a regular lvalue reference or rvalue reference
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum Referenceness {
+    /// Normal reference, i.e. lvalue
+    Reference,
+    /// RValue reference
+    RValueReference
+}
+
+/// Whether a C++ method has been explicitly defaulted or deleted.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum Explicitness {
+    /// Defaulted function, i.e. `=default`
+    Defaulted,
+    /// Deleted function, i.e. `=delete`
+    Deleted,
+}
+
+/// Location in the source code. Roughly equivalent to the same type
+/// within `clang_sys`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SourceLocation {
+    /// Line number.
+    pub line: usize,
+    /// Column number within line.
+    pub col: usize,
+    /// Byte offset within file.
+    pub byte_offset: usize,
+    /// Filename, if known.
+    pub file_name: Option<String>,
 }

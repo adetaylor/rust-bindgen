@@ -7,7 +7,6 @@ pub struct UsesTemplateParameter<T> {
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
-#[bindgen_original_name("UsesTemplateParameter::DoesNotUseTemplateParameters")]
 pub struct UsesTemplateParameter_DoesNotUseTemplateParameters {
     pub x: ::std::os::raw::c_int,
 }

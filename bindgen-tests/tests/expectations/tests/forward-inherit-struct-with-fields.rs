@@ -1,7 +1,6 @@
 #![allow(dead_code, non_snake_case, non_camel_case_types, non_upper_case_globals)]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-#[bindgen_original_name("RootedBase")]
 pub struct js_RootedBase<T> {
     pub _phantom_0: ::std::marker::PhantomData<::std::cell::UnsafeCell<T>>,
     pub foo: *mut T,

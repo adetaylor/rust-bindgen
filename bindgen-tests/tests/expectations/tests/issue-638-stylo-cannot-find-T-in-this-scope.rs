@@ -20,7 +20,6 @@ pub struct UsesRefPtrWithAliasedTypeParam<U> {
     pub _phantom_0: ::std::marker::PhantomData<::std::cell::UnsafeCell<U>>,
     pub member: RefPtr<UsesRefPtrWithAliasedTypeParam_V<U>>,
 }
-#[bindgen_original_name("UsesRefPtrWithAliasedTypeParam::V")]
 pub type UsesRefPtrWithAliasedTypeParam_V<U> = U;
 impl<U> Default for UsesRefPtrWithAliasedTypeParam<U> {
     fn default() -> Self {

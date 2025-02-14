@@ -1,12 +1,9 @@
 //! Helpers for code generation that don't need macro expansion.
 
-use proc_macro2::{Ident, Span, TokenStream};
+use proc_macro2::{Ident, Span};
 
-use crate::ir::comp::SpecialMemberKind;
-use crate::ir::function::Visibility;
 use crate::ir::context::BindgenContext;
 use crate::ir::layout::Layout;
-use crate::BindgenOptions;
 
 pub(crate) mod attributes {
     use proc_macro2::{Ident, Span, TokenStream};
@@ -78,190 +75,6 @@ pub(crate) mod attributes {
     }
 }
 
-pub(crate) trait CppSemanticAttributeCreator {
-    fn do_add(&mut self, ts: TokenStream);
-    fn is_enabled(&self) -> bool;
-
-    fn add(&mut self, tokens: TokenStream) {
-        if self.is_enabled() {
-            self.do_add(quote! {
-                #[cpp_semantics(#tokens)]
-            })
-        }
-    }
-
-    fn add_ident(&mut self, desc: &str) {
-        if self.is_enabled() {
-            let id = Ident::new(desc, Span::call_site());
-            self.add(quote! { #id })
-        }
-    }
-
-    fn special_member(&mut self, kind: SpecialMemberKind) {
-        let kind_str = match kind {
-            SpecialMemberKind::DefaultConstructor => "default_ctor",
-            SpecialMemberKind::CopyConstructor => "copy_ctor",
-            SpecialMemberKind::MoveConstructor => "move_ctor",
-            SpecialMemberKind::Destructor => "dtor",
-            SpecialMemberKind::AssignmentOperator => "assignment_operator",
-        };
-        self.add(quote! {
-            special_member(#kind_str)
-        })
-    }
-
-    fn original_name(&mut self, name: &str) {
-        self.add(quote! {
-            original_name(#name)
-        })
-    }
-
-    fn ret_type_reference(&mut self) {
-        self.add_ident("ret_type_reference")
-    }
-
-    fn ret_type_rvalue_reference(&mut self) {
-        self.add_ident("ret_type_rvalue_reference")
-    }
-
-    fn arg_type_reference(&mut self, arg_name: &Ident) {
-        self.add(quote! {
-            arg_type_reference(#arg_name)
-        })
-    }
-
-    fn field_type_reference(&mut self) {
-        self.add_ident("reference")
-    }
-
-    fn field_type_rvalue_reference(&mut self) {
-        self.add_ident("rvalue_reference")
-    }
-
-    fn is_virtual(&mut self) {
-        self.add_ident("bindgen_virtual")
-    }
-
-    fn arg_type_rvalue_reference(&mut self, arg_name: &Ident) {
-        self.add(quote! {
-            arg_type_rvalue_reference(#arg_name)
-        })
-    }
-
-    fn is_pure_virtual(&mut self) {
-        self.add_ident("pure_virtual")
-    }
-
-    fn visibility(&mut self, visibility: Visibility) {
-        match visibility {
-            Visibility::Protected => self.add_ident("visibility_protected"),
-            Visibility::Private => self.add_ident("visibility_private"),
-            _ => {}
-        }
-    }
-
-    fn incomprehensible_param_in_arg_or_return(&mut self) {
-        self.add_ident("incomprehensible_param_in_arg_or_return")
-    }
-
-    fn discards_template_param(&mut self) {
-        self.add_ident("unused_template_param")
-    }
-
-    fn deleted_fn(&mut self) {
-        self.add_ident("deleted")
-    }
-
-    fn defaulted_fn(&mut self) {
-        self.add_ident("defaulted")
-    }
-
-    fn layout(&mut self, layout: &Layout) {
-        let sz = ast_ty::int_expr(layout.size as i64);
-        let align = ast_ty::int_expr(layout.align as i64);
-        let packed = if layout.packed {
-            quote! { true }
-        } else {
-            quote! { false }
-        };
-        self.add(quote! {
-            layout(#sz, #align, #packed)
-        })
-    }
-
-    fn location(&mut self,
-        location: Option<&crate::clang::SourceLocation>,
-    ) {
-        if let Some(location) = location {
-            let (file, line, col, byte_offset) = location.location();
-            let line = ast_ty::int_expr(line as i64);
-            let col = ast_ty::int_expr(col as i64);
-            let byte_offset = ast_ty::int_expr(byte_offset as i64);
-            let file = file.name();
-            if let Some(filename) = file {
-                self.add(quote! {
-                    source_location(#filename, #line, #col, #byte_offset)
-                });
-            }
-        }
-    }
-}
-
-pub struct CppSemanticAttributeAdder<'a> {
-    enabled: bool,
-    attrs: &'a mut Vec<TokenStream>,
-}
-
-impl<'a> CppSemanticAttributeAdder<'a> {
-    pub(crate) fn new(
-        opts: &BindgenOptions,
-        attrs: &'a mut Vec<TokenStream>,
-    ) -> Self {
-        Self {
-            enabled: opts.cpp_semantic_attributes,
-            attrs,
-        }
-    }
-}
-
-impl<'a> CppSemanticAttributeCreator for CppSemanticAttributeAdder<'a> {
-    fn do_add(&mut self, ts: TokenStream) {
-        self.attrs.push(ts)
-    }
-
-    fn is_enabled(&self) -> bool {
-        self.enabled
-    }
-}
-
-pub struct CppSemanticAttributeSingle {
-    enabled: bool,
-    attr: TokenStream,
-}
-
-impl CppSemanticAttributeSingle {
-    pub(crate) fn new(opts: &BindgenOptions) -> Self {
-        Self {
-            enabled: opts.cpp_semantic_attributes,
-            attr: quote! {},
-        }
-    }
-
-    pub(crate) fn result(self) -> TokenStream {
-        self.attr
-    }
-}
-
-impl CppSemanticAttributeCreator for CppSemanticAttributeSingle {
-    fn do_add(&mut self, ts: TokenStream) {
-        self.attr.extend(ts);
-    }
-
-    fn is_enabled(&self) -> bool {
-        self.enabled
-    }
-}
-
 /// The `ffi_safe` argument should be true if this is a type that the user might
 /// reasonably use, e.g. not struct padding, where the `__BindgenOpaqueArray` is
 /// just noise.
@@ -272,6 +85,19 @@ pub(crate) fn blob(
     layout: Layout,
     ffi_safe: bool,
 ) -> syn::Type {
+    let inner_blob = blob_inner(ctx, layout, ffi_safe);
+    if ctx.options().use_opaque_newtype_wrapper {
+        syn::parse_quote! { __bindgen_marker_Opaque < #inner_blob > }
+    } else {
+        inner_blob
+    }
+}
+
+pub(crate) fn blob_inner(
+    ctx: &BindgenContext,
+    layout: Layout,
+    ffi_safe: bool,
+    ) -> syn::Type {
     let opaque = layout.opaque();
 
     // FIXME(emilio, #412): We fall back to byte alignment, but there are
@@ -573,5 +399,26 @@ pub(crate) mod ast_ty {
                 quote! { #name }
             })
             .collect()
+    }
+}
+
+pub(crate) fn reference(ty_ptr: syn::TypePtr, is_rvalue: bool, ctx: &BindgenContext) -> syn::Type {
+    let ptr = syn::Type::Ptr(ty_ptr);
+    if ctx.options().use_reference_newtype_wrapper {
+        if is_rvalue {
+            syn::parse_quote! { __bindgen_marker_RValueReference < #ptr >}
+        } else {
+            syn::parse_quote! { __bindgen_marker_Reference < #ptr >}
+        }
+    } else {
+        ptr
+    }
+}
+
+pub(crate) fn with_unused_template_args(inner: syn::Type, ctx: &BindgenContext) -> syn::Type {
+    if ctx.options().use_unused_template_param_newtype_wrapper {
+        syn::parse_quote! { __bindgen_marker_UnusedTemplateParam< #inner > }
+    } else {
+        inner
     }
 }

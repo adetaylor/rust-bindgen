@@ -1,9 +1,7 @@
 #![allow(dead_code, non_snake_case, non_camel_case_types, non_upper_case_globals)]
-#[bindgen_original_name("Wrapped")]
 pub type JS_detail_Wrapped<T> = T;
 #[repr(C)]
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
-#[bindgen_original_name("Rooted")]
 pub struct JS_Rooted<T> {
     pub _phantom_0: ::std::marker::PhantomData<::std::cell::UnsafeCell<T>>,
     pub ptr: JS_detail_Wrapped<T>,

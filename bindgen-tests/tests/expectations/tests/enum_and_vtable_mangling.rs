@@ -33,7 +33,6 @@ impl Default for C {
     }
 }
 unsafe extern "C" {
-    #[bindgen_original_name("match")]
     #[link_name = "\u{1}_ZN1C5matchEv"]
     pub fn C_match(this: *mut ::std::os::raw::c_void);
 }

@@ -16,7 +16,6 @@ pub mod root {
  This class is not so interesting, but worth a bit of docs too!*/
     #[repr(C)]
     #[derive(Debug, Default, Copy, Clone)]
-    #[bindgen_original_name("Foo::Bar")]
     pub struct Foo_Bar {
         pub _address: u8,
     }

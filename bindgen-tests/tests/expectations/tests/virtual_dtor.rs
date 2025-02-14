@@ -21,8 +21,6 @@ impl Default for nsSlots {
     }
 }
 unsafe extern "C" {
-    #[bindgen_original_name("nsSlots_destructor")]
-    #[bindgen_special_member("dtor")]
     #[link_name = "\u{1}_ZN7nsSlotsD1Ev"]
     pub fn nsSlots_nsSlots_destructor(this: *mut nsSlots);
 }

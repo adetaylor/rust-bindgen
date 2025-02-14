@@ -4,13 +4,9 @@
 pub struct DataType {
     pub _address: u8,
 }
-#[bindgen_original_name("DataType::value_type")]
 pub type DataType_value_type<_Tp> = _Tp;
-#[bindgen_original_name("DataType::work_type")]
 pub type DataType_work_type<_Tp> = DataType_value_type<_Tp>;
-#[bindgen_original_name("DataType::channel_type")]
 pub type DataType_channel_type<_Tp> = DataType_value_type<_Tp>;
-#[bindgen_original_name("DataType::vec_type")]
 pub type DataType_vec_type<_Tp> = DataType_value_type<_Tp>;
 pub const DataType_generic_type: DataType__bindgen_ty_1 = DataType__bindgen_ty_1::generic_type;
 pub const DataType_depth: DataType__bindgen_ty_1 = DataType__bindgen_ty_1::generic_type;

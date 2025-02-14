@@ -23,7 +23,6 @@ impl Default for Base {
     }
 }
 unsafe extern "C" {
-    #[bindgen_original_name("AsDerived")]
     #[link_name = "\u{1}_ZN4Base9AsDerivedEv"]
     pub fn Base_AsDerived(this: *mut ::std::os::raw::c_void) -> *mut Derived;
 }

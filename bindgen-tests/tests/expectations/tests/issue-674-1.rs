@@ -11,7 +11,6 @@ pub mod root {
         pub struct Maybe {
             pub _address: u8,
         }
-        #[bindgen_original_name("Maybe::ValueType")]
         pub type Maybe_ValueType<T> = T;
     }
     #[repr(C)]

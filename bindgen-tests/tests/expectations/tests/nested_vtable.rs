@@ -25,7 +25,6 @@ impl Default for nsISupports {
     }
 }
 unsafe extern "C" {
-    #[bindgen_original_name("QueryInterface")]
     #[link_name = "\u{1}_ZN11nsISupports14QueryInterfaceEv"]
     pub fn nsISupports_QueryInterface(
         this: *mut ::std::os::raw::c_void,

@@ -11,7 +11,6 @@ const _: () = {
     ["Offset of field: Bar::m_baz"][::std::mem::offset_of!(Bar, m_baz) - 0usize];
 };
 unsafe extern "C" {
-    #[bindgen_original_name("Bar")]
     #[link_name = "\u{1}_ZN3BarC1Ei"]
     pub fn Bar_Bar(this: *mut Bar, baz: ::std::os::raw::c_int);
 }

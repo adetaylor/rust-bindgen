@@ -12,9 +12,6 @@ pub(crate) enum Error {
     /// template specialization).
     InstantiationOfOpaqueType,
 
-    /// Type was a reference not a pointer, but we had nowhere to record that fact.
-    ReferenceButCouldNotRecord,
-
     /// Function ABI is not supported.
     UnsupportedAbi(&'static str),
 
@@ -35,9 +32,6 @@ impl fmt::Display for Error {
             Error::InstantiationOfOpaqueType => {
                 "Instantiation of opaque template type or partial template specialization."
                     .fmt(f)
-            }
-            Error::ReferenceButCouldNotRecord => {
-                "Type was a reference in a context where we only expected other types".fmt(f)
             }
             Error::UnsupportedAbi(abi) => {
                  write!(

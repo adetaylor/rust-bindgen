@@ -17,14 +17,12 @@ pub struct Test {
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
-#[bindgen_original_name("Test::Size")]
 pub struct Test_Size {
     pub mWidth: Test_Size_Dimension,
     pub mHeight: Test_Size_Dimension,
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
-#[bindgen_original_name("Test::Size::Dimension")]
 pub struct Test_Size_Dimension {
     pub _base: Calc,
 }

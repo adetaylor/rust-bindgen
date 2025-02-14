@@ -6,7 +6,6 @@ pub struct HasRefPtr<T> {
     pub _phantom_0: ::std::marker::PhantomData<::std::cell::UnsafeCell<T>>,
     pub refptr_member: RefPtr<HasRefPtr_TypedefOfT<T>>,
 }
-#[bindgen_original_name("HasRefPtr::TypedefOfT")]
 pub type HasRefPtr_TypedefOfT<T> = T;
 impl<T> Default for HasRefPtr<T> {
     fn default() -> Self {

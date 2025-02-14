@@ -1,7 +1,6 @@
 #![allow(dead_code, non_snake_case, non_camel_case_types, non_upper_case_globals)]
 #[repr(C)]
 #[derive(Debug, Default)]
-#[bindgen_original_name("Foo")]
 pub struct cv_Foo {
     pub _address: u8,
 }
@@ -11,8 +10,6 @@ const _: () = {
     ["Alignment of cv_Foo"][::std::mem::align_of::<cv_Foo>() - 1usize];
 };
 unsafe extern "C" {
-    #[bindgen_original_name("Foo_destructor")]
-    #[bindgen_special_member("dtor")]
     #[link_name = "\u{1}_ZN2cv3FooD1Ev"]
     pub fn cv_Foo_Foo_destructor(this: *mut cv_Foo);
 }

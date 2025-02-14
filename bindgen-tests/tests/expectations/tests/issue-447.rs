@@ -40,7 +40,6 @@ pub mod root {
         ][::std::mem::align_of::<JSAutoCompartment>() - 1usize];
     };
     unsafe extern "C" {
-        #[bindgen_original_name("JSAutoCompartment")]
         #[link_name = "\u{1}_ZN17JSAutoCompartmentC1EN7mozilla6detail19GuardObjectNotifierE"]
         pub fn JSAutoCompartment_JSAutoCompartment(
             this: *mut root::JSAutoCompartment,

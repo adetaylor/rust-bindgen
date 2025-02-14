@@ -8,7 +8,6 @@ pub struct AllowlistMe<T> {
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-#[bindgen_original_name("AllowlistMe::Inner")]
 pub struct AllowlistMe_Inner<T> {
     pub _phantom_0: ::std::marker::PhantomData<::std::cell::UnsafeCell<T>>,
     pub bar: T,

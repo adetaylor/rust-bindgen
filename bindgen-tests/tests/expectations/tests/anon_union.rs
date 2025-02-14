@@ -10,20 +10,17 @@ impl TErrorResult_UnionState {
     pub const HasException: TErrorResult_UnionState = TErrorResult_UnionState::HasMessage;
 }
 #[repr(i32)]
-#[bindgen_original_name("TErrorResult::UnionState")]
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
 pub enum TErrorResult_UnionState {
     HasMessage = 0,
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-#[bindgen_original_name("TErrorResult::Message")]
 pub struct TErrorResult_Message {
     _unused: [u8; 0],
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-#[bindgen_original_name("TErrorResult::DOMExceptionInfo")]
 pub struct TErrorResult_DOMExceptionInfo {
     _unused: [u8; 0],
 }

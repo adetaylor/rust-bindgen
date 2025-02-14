@@ -153,17 +153,14 @@ const _: () = {
     ["Alignment of Foo"][::std::mem::align_of::<Foo>() - 1usize];
 };
 unsafe extern "C" {
-    #[bindgen_original_name("type")]
     #[link_name = "\u{1}_ZN3Foo4typeEv"]
     pub fn Foo_type(this: *mut Foo) -> ::std::os::raw::c_char;
 }
 unsafe extern "C" {
-    #[bindgen_original_name("set_type_")]
     #[link_name = "\u{1}_ZN3Foo9set_type_Ec"]
     pub fn Foo_set_type_(this: *mut Foo, c: ::std::os::raw::c_char);
 }
 unsafe extern "C" {
-    #[bindgen_original_name("set_type")]
     #[link_name = "\u{1}_ZN3Foo8set_typeEc"]
     pub fn Foo_set_type(this: *mut Foo, c: ::std::os::raw::c_char);
 }
