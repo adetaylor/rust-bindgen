@@ -494,7 +494,7 @@ impl Cursor {
     where
         Visitor: FnMut(Cursor) -> CXChildVisitResult,
     {
-        let data = &mut visitor as *mut Visitor;
+        let data = ptr::addr_of_mut!(visitor);
         unsafe {
             clang_visitChildren(self.x, visit_children::<Visitor>, data.cast());
         }
@@ -1060,9 +1060,7 @@ pub(crate) struct ClangToken {
 impl ClangToken {
     /// Get the token spelling, without being converted to utf-8.
     pub(crate) fn spelling(&self) -> &[u8] {
-        let c_str = unsafe {
-            CStr::from_ptr(clang_getCString(self.spelling) as *const _)
-        };
+        let c_str = unsafe { CStr::from_ptr(clang_getCString(self.spelling)) };
         c_str.to_bytes()
     }
 
@@ -1113,9 +1111,9 @@ impl Iterator for ClangTokenIterator<'_> {
             let spelling = clang_getTokenSpelling(self.tu, *raw);
             let extent = clang_getTokenExtent(self.tu, *raw);
             Some(ClangToken {
-                kind,
-                extent,
                 spelling,
+                extent,
+                kind,
             })
         }
     }
@@ -1139,7 +1137,7 @@ extern "C" fn visit_children<Visitor>(
 where
     Visitor: FnMut(Cursor) -> CXChildVisitResult,
 {
-    let func: &mut Visitor = unsafe { &mut *(data as *mut Visitor) };
+    let func: &mut Visitor = unsafe { &mut *data.cast::<Visitor>() };
     let child = Cursor { x: cur };
 
     (*func)(child)
@@ -1776,9 +1774,9 @@ impl File {
 
 fn cxstring_to_string_leaky(s: CXString) -> String {
     if s.data.is_null() {
-        return "".to_owned();
+        return String::new();
     }
-    let c_str = unsafe { CStr::from_ptr(clang_getCString(s) as *const _) };
+    let c_str = unsafe { CStr::from_ptr(clang_getCString(s)) };
     c_str.to_string_lossy().into_owned()
 }
 
@@ -1931,7 +1929,6 @@ impl Drop for TranslationUnit {
 /// Translation unit used for macro fallback parsing
 pub(crate) struct FallbackTranslationUnit {
     file_path: String,
-    header_path: String,
     pch_path: String,
     idx: Box<Index>,
     tu: TranslationUnit,
@@ -1947,7 +1944,6 @@ impl FallbackTranslationUnit {
     /// Create a new fallback translation unit
     pub(crate) fn new(
         file: String,
-        header_path: String,
         pch_path: String,
         c_args: &[Box<str>],
     ) -> Option<Self> {
@@ -1969,7 +1965,6 @@ impl FallbackTranslationUnit {
         )?;
         Some(FallbackTranslationUnit {
             file_path: file,
-            header_path,
             pch_path,
             tu: f_translation_unit,
             idx: f_index,
@@ -2008,7 +2003,6 @@ impl FallbackTranslationUnit {
 impl Drop for FallbackTranslationUnit {
     fn drop(&mut self) {
         let _ = std::fs::remove_file(&self.file_path);
-        let _ = std::fs::remove_file(&self.header_path);
         let _ = std::fs::remove_file(&self.pch_path);
     }
 }

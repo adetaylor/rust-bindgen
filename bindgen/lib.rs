@@ -89,10 +89,12 @@ pub const DEFAULT_ANON_FIELDS_PREFIX: &str = "__bindgen_anon_";
 const DEFAULT_NON_EXTERN_FNS_SUFFIX: &str = "__extern";
 
 fn file_is_cpp(name_file: &str) -> bool {
-    name_file.ends_with(".hpp") ||
-        name_file.ends_with(".hxx") ||
-        name_file.ends_with(".hh") ||
-        name_file.ends_with(".h++")
+    Path::new(name_file).extension().map_or(false, |ext| {
+        ext.eq_ignore_ascii_case("hpp") ||
+            ext.eq_ignore_ascii_case("hxx") ||
+            ext.eq_ignore_ascii_case("hh") ||
+            ext.eq_ignore_ascii_case("h++")
+    })
 }
 
 fn args_are_cpp(clang_args: &[Box<str>]) -> bool {
@@ -209,7 +211,7 @@ impl std::fmt::Display for Formatter {
             Self::Prettyplease => "prettyplease",
         };
 
-        s.fmt(f)
+        std::fmt::Display::fmt(&s, f)
     }
 }
 
@@ -349,6 +351,18 @@ impl Builder {
         }
 
         // Transform input headers to arguments on the clang command line.
+        self.options.fallback_clang_args = self
+            .options
+            .clang_args
+            .iter()
+            .filter(|arg| {
+                !arg.starts_with("-MMD") &&
+                    !arg.starts_with("-MD") &&
+                    !arg.starts_with("--write-user-dependencies") &&
+                    !arg.starts_with("--user-dependencies")
+            })
+            .cloned()
+            .collect::<Vec<_>>();
         self.options.clang_args.extend(
             self.options.input_headers
                 [..self.options.input_headers.len().saturating_sub(1)]
@@ -364,7 +378,7 @@ impl Builder {
                 })
                 .collect::<Vec<_>>();
 
-        Bindings::generate(self.options, input_unsaved_files)
+        Bindings::generate(self.options, &input_unsaved_files)
     }
 
     /// Preprocess and dump the input header files to disk.
@@ -583,9 +597,7 @@ impl BindgenOptions {
 
     fn process_comment(&self, comment: &str) -> String {
         let comment = comment::preprocess(comment);
-        self.parse_callbacks
-            .last()
-            .and_then(|cb| cb.process_comment(&comment))
+        self.last_callback(|cb| cb.process_comment(&comment))
             .unwrap_or(comment)
     }
 }
@@ -730,7 +742,7 @@ impl Bindings {
     /// Generate bindings for the given options.
     pub(crate) fn generate(
         mut options: BindgenOptions,
-        input_unsaved_files: Vec<clang::UnsavedFile>,
+        input_unsaved_files: &[clang::UnsavedFile],
     ) -> Result<Bindings, BindgenError> {
         ensure_libclang_is_loaded();
 
@@ -838,7 +850,7 @@ impl Bindings {
             };
 
             if let Some(search_paths) = search_paths {
-                for path in search_paths.into_iter() {
+                for path in search_paths {
                     if let Ok(path) = path.into_os_string().into_string() {
                         options.clang_args.push("-isystem".into());
                         options.clang_args.push(path.into_boxed_str());
@@ -887,7 +899,7 @@ impl Bindings {
         debug!("Fixed-up options: {options:?}");
 
         let time_phases = options.time_phases;
-        let mut context = BindgenContext::new(options, &input_unsaved_files);
+        let mut context = BindgenContext::new(options, input_unsaved_files);
 
         if is_host_build {
             debug_assert_eq!(
@@ -999,6 +1011,12 @@ impl Bindings {
         {
             cmd.args(["--config-path", path]);
         }
+
+        let edition = self
+            .options
+            .rust_edition
+            .unwrap_or_else(|| self.options.rust_target.latest_edition());
+        cmd.args(["--edition", &format!("{edition}")]);
 
         let mut child = cmd.spawn()?;
         let mut child_stdin = child.stdin.take().unwrap();
@@ -1141,8 +1159,9 @@ fn parse(context: &mut BindgenContext) -> Result<(), BindgenError> {
         cursor.visit_sorted(ctx, |ctx, child| parse_one(ctx, child, None));
     });
 
-    assert!(
-        context.current_module() == context.root_module(),
+    assert_eq!(
+        context.current_module(),
+        context.root_module(),
         "How did this happen?"
     );
     Ok(())

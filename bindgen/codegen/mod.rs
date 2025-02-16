@@ -694,7 +694,7 @@ impl CodeGenerator for Var {
 
         let mut attrs = vec![];
         if let Some(comment) = item.comment(ctx) {
-            attrs.push(attributes::doc(comment));
+            attrs.push(attributes::doc(&comment));
         }
 
         let var_ty = self.ty();
@@ -796,20 +796,20 @@ impl CodeGenerator for Var {
                 }
             }
         } else {
-            // If necessary, apply a `#[link_name]` attribute
-            if let Some(link_name) = self.link_name() {
-                attrs.push(attributes::link_name::<false>(link_name));
-            } else {
+            let symbol: &str = self.link_name().unwrap_or_else(|| {
                 let link_name =
                     self.mangled_name().unwrap_or_else(|| self.name());
-                if !utils::names_will_be_identical_after_mangling(
+                if utils::names_will_be_identical_after_mangling(
                     &canonical_name,
                     link_name,
                     None,
                 ) {
+                    canonical_name.as_str()
+                } else {
                     attrs.push(attributes::link_name::<false>(link_name));
+                    link_name
                 }
-            }
+            });
 
             let maybe_mut = if self.is_const() {
                 quote! {}
@@ -832,8 +832,10 @@ impl CodeGenerator for Var {
 
             if ctx.options().dynamic_library_name.is_some() {
                 result.dynamic_items().push_var(
-                    canonical_ident,
-                    self.ty()
+                    &canonical_ident,
+                    symbol,
+                    &self
+                        .ty()
                         .to_rust_ty_or_opaque(ctx, &())
                         .into_token_stream(),
                     ctx.options().dynamic_link_require_all,
@@ -904,7 +906,7 @@ impl CodeGenerator for Type {
                 let rust_name = ctx.rust_ident(name);
 
                 let mut tokens = if let Some(comment) = item.comment(ctx) {
-                    attributes::doc(comment)
+                    attributes::doc(&comment)
                 } else {
                     quote! {}
                 };
@@ -1025,7 +1027,7 @@ impl CodeGenerator for Type {
                 });
 
                 let mut tokens = if let Some(comment) = item.comment(ctx) {
-                    attributes::doc(comment)
+                    attributes::doc(&comment)
                 } else {
                     quote! {}
                 };
@@ -1564,7 +1566,7 @@ impl FieldCodegen<'_> for FieldData {
         if ctx.options().generate_comments {
             if let Some(raw_comment) = self.comment() {
                 let comment = ctx.options().process_comment(raw_comment);
-                field = attributes::doc(comment);
+                field = attributes::doc(&comment);
             }
         }
 
@@ -1686,7 +1688,7 @@ impl Bitfield {
     fn extend_ctor_impl(
         &self,
         ctx: &BindgenContext,
-        param_name: proc_macro2::TokenStream,
+        param_name: &proc_macro2::TokenStream,
         mut ctor_impl: proc_macro2::TokenStream,
     ) -> proc_macro2::TokenStream {
         let bitfield_ty = ctx.resolve_type(self.ty());
@@ -1889,7 +1891,7 @@ impl FieldCodegen<'_> for BitfieldUnit {
             ctor_params.push(quote! {
                 #param_name : #bitfield_ty
             });
-            ctor_impl = bf.extend_ctor_impl(ctx, param_name, ctor_impl);
+            ctor_impl = bf.extend_ctor_impl(ctx, &param_name, ctor_impl);
         }
 
         let access_spec = access_specifier(unit_visibility);
@@ -2380,7 +2382,9 @@ impl CodeGenerator for CompInfo {
                     });
                 }
                 None => {
-                    warn!("Opaque type without layout! Expect dragons!");
+                    if !forward_decl {
+                        warn!("Opaque type without layout! Expect dragons!");
+                    }
                 }
             }
         } else if !is_union && !zero_sized {
@@ -2476,7 +2480,7 @@ impl CodeGenerator for CompInfo {
         let mut needs_partialeq_impl = false;
         let needs_flexarray_impl = flex_array_generic.is_some();
         if let Some(comment) = item.comment(ctx) {
-            attributes.push(attributes::doc(comment));
+            attributes.push(attributes::doc(&comment));
         }
 
         // if a type has both a "packed" attribute and an "align(N)" attribute, then check if the
@@ -2680,12 +2684,9 @@ impl CodeGenerator for CompInfo {
                     } else {
                         self.fields()
                             .iter()
-                            .filter_map(|field| match *field {
-                                Field::DataMember(ref f) if f.name().is_some() => Some(f),
-                                _ => None,
-                            })
-                            .flat_map(|field| {
-                                let name = field.name().unwrap();
+                            .filter_map(|field| {
+                                let Field::DataMember(field) = field else { return None };
+                                let name = field.name()?;
                                 field.offset().map(|offset| {
                                     let field_offset = offset / 8;
                                     let field_name = ctx.rust_ident(name);
@@ -2754,7 +2755,7 @@ impl CodeGenerator for CompInfo {
             let mut method_names = Default::default();
             if ctx.options().codegen_config.methods() {
                 for method in self.methods() {
-                    assert!(method.kind() != MethodKind::Constructor);
+                    assert_ne!(method.kind(), MethodKind::Constructor);
                     method.codegen_method(
                         ctx,
                         &mut methods,
@@ -2818,7 +2819,7 @@ impl CodeGenerator for CompInfo {
             result.push(self.generate_flexarray(
                 ctx,
                 &canonical_ident,
-                flex_inner_ty,
+                flex_inner_ty.as_ref(),
                 &generic_param_names,
                 &impl_generics_labels,
             ));
@@ -2913,7 +2914,7 @@ impl CompInfo {
         &self,
         ctx: &BindgenContext,
         canonical_ident: &Ident,
-        flex_inner_ty: Option<proc_macro2::TokenStream>,
+        flex_inner_ty: Option<&proc_macro2::TokenStream>,
         generic_param_names: &[Ident],
         impl_generics_labels: &proc_macro2::TokenStream,
     ) -> proc_macro2::TokenStream {
@@ -3058,7 +3059,7 @@ impl Method {
             let cc = &ctx.options().codegen_config;
             match self.kind() {
                 MethodKind::Constructor => cc.constructors(),
-                MethodKind::Destructor => cc.destructors(),
+                MethodKind::Destructor |
                 MethodKind::VirtualDestructor { .. } => cc.destructors(),
                 MethodKind::Static |
                 MethodKind::Normal |
@@ -3248,14 +3249,14 @@ pub enum EnumVariation {
 }
 
 impl EnumVariation {
-    fn is_rust(&self) -> bool {
-        matches!(*self, EnumVariation::Rust { .. })
+    fn is_rust(self) -> bool {
+        matches!(self, EnumVariation::Rust { .. })
     }
 
     /// Both the `Const` and `ModuleConsts` variants will cause this to return
     /// true.
-    fn is_const(&self) -> bool {
-        matches!(*self, EnumVariation::Consts | EnumVariation::ModuleConsts)
+    fn is_const(self) -> bool {
+        matches!(self, EnumVariation::Consts | EnumVariation::ModuleConsts)
     }
 }
 
@@ -3360,7 +3361,7 @@ impl<'a> EnumBuilder<'a> {
     fn new(
         name: &'a str,
         mut attrs: Vec<proc_macro2::TokenStream>,
-        repr: syn::Type,
+        repr: &syn::Type,
         enum_variation: EnumVariation,
         has_typedef: bool,
     ) -> Self {
@@ -3429,7 +3430,7 @@ impl<'a> EnumBuilder<'a> {
         ctx: &BindgenContext,
         variant: &EnumVariant,
         mangling_prefix: Option<&str>,
-        rust_ty: syn::Type,
+        rust_ty: &syn::Type,
         result: &mut CodegenResult<'_>,
         is_ty_named: bool,
     ) -> Self {
@@ -3448,7 +3449,7 @@ impl<'a> EnumBuilder<'a> {
         if ctx.options().generate_comments {
             if let Some(raw_comment) = variant.comment() {
                 let comment = ctx.options().process_comment(raw_comment);
-                doc = attributes::doc(comment);
+                doc = attributes::doc(&comment);
             }
         }
 
@@ -3541,7 +3542,7 @@ impl<'a> EnumBuilder<'a> {
     fn build(
         self,
         ctx: &BindgenContext,
-        rust_ty: syn::Type,
+        rust_ty: &syn::Type,
         result: &mut CodegenResult<'_>,
     ) -> proc_macro2::TokenStream {
         match self {
@@ -3746,7 +3747,7 @@ impl CodeGenerator for Enum {
         };
 
         if let Some(comment) = item.comment(ctx) {
-            attrs.push(attributes::doc(comment));
+            attrs.push(attributes::doc(&comment));
         }
 
         if item.must_use(ctx) {
@@ -3813,7 +3814,7 @@ impl CodeGenerator for Enum {
             // value.
             variant_name: &Ident,
             referenced_name: &Ident,
-            enum_rust_ty: syn::Type,
+            enum_rust_ty: &syn::Type,
             result: &mut CodegenResult<'_>,
         ) {
             let constant_name = if enum_.name().is_some() {
@@ -3846,7 +3847,7 @@ impl CodeGenerator for Enum {
         });
 
         let mut builder =
-            EnumBuilder::new(&name, attrs, repr, variation, has_typedef);
+            EnumBuilder::new(&name, attrs, &repr, variation, has_typedef);
 
         // A map where we keep a value -> variant relation.
         let mut seen_values = HashMap::<_, Ident>::default();
@@ -3922,7 +3923,7 @@ impl CodeGenerator for Enum {
                                 &ident,
                                 &Ident::new(&mangled_name, Span::call_site()),
                                 existing_variant_name,
-                                enum_rust_ty.clone(),
+                                &enum_rust_ty,
                                 result,
                             );
                         }
@@ -3931,7 +3932,7 @@ impl CodeGenerator for Enum {
                             ctx,
                             variant,
                             constant_mangling_prefix,
-                            enum_rust_ty.clone(),
+                            &enum_rust_ty,
                             result,
                             enum_ty.name().is_some(),
                         );
@@ -3942,7 +3943,7 @@ impl CodeGenerator for Enum {
                         ctx,
                         variant,
                         constant_mangling_prefix,
-                        enum_rust_ty.clone(),
+                        &enum_rust_ty,
                         result,
                         enum_ty.name().is_some(),
                     );
@@ -3973,7 +3974,7 @@ impl CodeGenerator for Enum {
                             &ident,
                             &mangled_name,
                             &variant_name,
-                            enum_rust_ty.clone(),
+                            &enum_rust_ty,
                             result,
                         );
                     }
@@ -3983,7 +3984,7 @@ impl CodeGenerator for Enum {
             }
         }
 
-        let item = builder.build(ctx, enum_rust_ty, result);
+        let item = builder.build(ctx, &enum_rust_ty, result);
         result.push(item);
     }
 }
@@ -4673,7 +4674,7 @@ impl CodeGenerator for Function {
             FunctionKind::Function => {
                 ctx.options().dynamic_library_name.is_some()
             }
-            _ => false,
+            FunctionKind::Method(_) => false,
         };
 
         // Similar to static member variables in a class template, we can't
@@ -4717,7 +4718,7 @@ impl CodeGenerator for Function {
         }
 
         if let Some(comment) = item.comment(ctx) {
-            attributes.push(attributes::doc(comment));
+            attributes.push(attributes::doc(&comment));
         }
 
         if is_pure_virtual {
@@ -4776,21 +4777,19 @@ impl CodeGenerator for Function {
             ctx.options().for_each_callback(|cb| cb.denote_explicit(id, Explicitness::Defaulted));
         }
 
-        let mut has_link_name_attr = false;
-        if let Some(link_name) = self.link_name() {
-            attributes.push(attributes::link_name::<false>(link_name));
-            has_link_name_attr = true;
-        } else {
-            let link_name = mangled_name.unwrap_or(name);
-            if !is_dynamic_function &&
-                !utils::names_will_be_identical_after_mangling(
-                    &canonical_name,
-                    link_name,
-                    Some(abi),
-                )
-            {
+        let link_name_attr = self.link_name().or_else(|| {
+            let mangled_name = mangled_name.unwrap_or(name);
+            (!utils::names_will_be_identical_after_mangling(
+                &canonical_name,
+                mangled_name,
+                Some(abi),
+            ))
+            .then(|| mangled_name)
+        });
+
+        if let Some(link_name) = link_name_attr {
+            if !is_dynamic_function {
                 attributes.push(attributes::link_name::<false>(link_name));
-                has_link_name_attr = true;
             }
         }
 
@@ -4802,8 +4801,9 @@ impl CodeGenerator for Function {
                 quote! { #[link(wasm_import_module = #name)] }
             });
 
-        let should_wrap =
-            is_internal && ctx.options().wrap_static_fns && !has_link_name_attr;
+        let should_wrap = is_internal &&
+            ctx.options().wrap_static_fns &&
+            link_name_attr.is_none();
 
         if should_wrap {
             let name = canonical_name.clone() + ctx.wrap_static_fns_suffix();
@@ -4869,19 +4869,22 @@ impl CodeGenerator for Function {
 
         // If we're doing dynamic binding generation, add to the dynamic items.
         if is_dynamic_function {
+            let ident_str = ident.to_string();
+            let symbol = link_name_attr.unwrap_or(&ident_str);
             let args_identifiers =
                 utils::fnsig_argument_identifiers(ctx, signature);
             let ret_ty = utils::fnsig_return_ty(ctx, signature);
             result.dynamic_items().push_func(
-                ident,
+                &ident,
+                symbol,
                 abi,
                 signature.is_variadic(),
                 ctx.options().dynamic_link_require_all,
-                args,
-                args_identifiers,
-                ret,
-                ret_ty,
-                attributes,
+                &args,
+                &args_identifiers,
+                &ret,
+                &ret_ty,
+                &attributes,
                 ctx,
             );
         } else {
@@ -5295,7 +5298,7 @@ pub(crate) fn codegen(
         if let Some(ref lib_name) = context.options().dynamic_library_name {
             let lib_ident = context.rust_ident(lib_name);
             let dynamic_items_tokens =
-                result.dynamic_items().get_tokens(lib_ident, context);
+                result.dynamic_items().get_tokens(&lib_ident, context);
             result.push(dynamic_items_tokens);
         }
 
@@ -5839,7 +5842,7 @@ pub(crate) mod utils {
 
     pub(crate) fn fnsig_argument_type(
         ctx: &BindgenContext,
-        ty: &TypeId,
+        ty: TypeId,
     ) -> syn::Type {
         use super::ToPtr;
 
@@ -5891,7 +5894,7 @@ pub(crate) mod utils {
         let mut unnamed_arguments = 0;
         let mut args = args_iter
             .map(|(name, ty)| {
-                let arg_ty = fnsig_argument_type(ctx, ty);
+                let arg_ty = fnsig_argument_type(ctx, *ty);
 
                 let arg_name = if let Some(ref name) = *name {
                     ctx.rust_mangle(name).into_owned()
@@ -6017,7 +6020,7 @@ pub(crate) mod utils {
 
         // Check that the mangled name contains the canonical name after the
         // prefix
-        if &mangled_name[1..canonical_name.len() + 1] != canonical_name {
+        if &mangled_name[1..=canonical_name.len()] != canonical_name {
             return false;
         }
 

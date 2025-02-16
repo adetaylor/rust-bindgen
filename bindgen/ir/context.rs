@@ -29,8 +29,6 @@ use quote::ToTokens;
 use std::borrow::Cow;
 use std::cell::{Cell, RefCell};
 use std::collections::{BTreeSet, HashMap as StdHashMap};
-use std::fs::OpenOptions;
-use std::io::Write;
 use std::mem;
 use std::path::Path;
 
@@ -198,8 +196,8 @@ impl From<ItemId> for usize {
 
 impl ItemId {
     /// Get a numeric representation of this ID.
-    pub(crate) fn as_usize(&self) -> usize {
-        (*self).into()
+    pub(crate) fn as_usize(self) -> usize {
+        self.into()
     }
 }
 
@@ -782,7 +780,7 @@ If you encounter an error missing from this list, please file an issue or a PR!"
     /// codegen'd, even if its parent is not allowlisted. See issue #769 for
     /// details.
     fn add_item_to_module(&mut self, item: &Item) {
-        assert!(item.id() != self.root_module);
+        assert_ne!(item.id(), self.root_module);
         assert!(self.resolve_item_fallible(item.id()).is_none());
 
         if let Some(ref mut parent) = self.items[item.parent_id().0] {
@@ -804,7 +802,7 @@ If you encounter an error missing from this list, please file an issue or a PR!"
             self.current_module
         );
 
-        self.items[(self.current_module.0).0]
+        self.items[self.current_module.0 .0]
             .as_mut()
             .expect("Should always have an item for self.current_module")
             .as_module_mut()
@@ -867,7 +865,7 @@ If you encounter an error missing from this list, please file an issue or a PR!"
                 "abstract" | "alignof" | "as" | "async" | "await" | "become" |
                     "box" | "break" | "const" | "continue" | "crate" | "do" |
                     "dyn" | "else" | "enum" | "extern" | "false" | "final" |
-                    "fn" | "for" | "if" | "impl" | "in" | "let" | "loop" |
+                    "fn" | "for" | "gen" | "if" | "impl" | "in" | "let" | "loop" |
                     "macro" | "match" | "mod" | "move" | "mut" | "offsetof" |
                     "override" | "priv" | "proc" | "pub" | "pure" | "ref" |
                     "return" | "Self" | "self" | "sizeof" | "static" |
@@ -1232,7 +1230,7 @@ If you encounter an error missing from this list, please file an issue or a PR!"
         &self,
     ) -> traversal::AssertNoDanglingItemsTraversal {
         assert!(self.in_codegen_phase());
-        assert!(self.current_module == self.root_module);
+        assert_eq!(self.current_module, self.root_module);
 
         let roots = self.items().map(|(id, _)| id);
         traversal::AssertNoDanglingItemsTraversal::new(
@@ -1248,7 +1246,7 @@ If you encounter an error missing from this list, please file an issue or a PR!"
     fn assert_every_item_in_a_module(&self) {
         if cfg!(feature = "__testing_only_extra_assertions") {
             assert!(self.in_codegen_phase());
-            assert!(self.current_module == self.root_module);
+            assert_eq!(self.current_module, self.root_module);
 
             for (id, _item) in self.items() {
                 if id == self.root_module {
@@ -2057,8 +2055,11 @@ If you encounter an error missing from this list, please file an issue or a PR!"
 
             let mut header_names_to_compile = Vec::new();
             let mut header_paths = Vec::new();
-            let mut header_contents = String::new();
-            for input_header in &self.options.input_headers {
+            let mut header_includes = Vec::new();
+            let single_header = self.options().input_headers.last().cloned()?;
+            for input_header in &self.options.input_headers
+                [..self.options.input_headers.len() - 1]
+            {
                 let path = Path::new(input_header.as_ref());
                 if let Some(header_path) = path.parent() {
                     if header_path == Path::new("") {
@@ -2070,50 +2071,32 @@ If you encounter an error missing from this list, please file an issue or a PR!"
                     header_paths.push(".");
                 }
                 let header_name = path.file_name()?.to_str()?;
+                header_includes.push(header_name.to_string());
                 header_names_to_compile
                     .push(header_name.split(".h").next()?.to_string());
-                header_contents +=
-                    format!("\n#include <{header_name}>").as_str();
             }
-            let header_to_precompile = format!(
+            let pch = format!(
                 "{}/{}",
                 match self.options().clang_macro_fallback_build_dir {
                     Some(ref path) => path.as_os_str().to_str()?,
                     None => ".",
                 },
-                header_names_to_compile.join("-") + "-precompile.h"
+                header_names_to_compile.join("-") + "-precompile.h.pch"
             );
-            let pch = header_to_precompile.clone() + ".pch";
 
-            let mut header_to_precompile_file = OpenOptions::new()
-                .create(true)
-                .truncate(true)
-                .write(true)
-                .open(&header_to_precompile)
-                .ok()?;
-            header_to_precompile_file
-                .write_all(header_contents.as_bytes())
-                .ok()?;
-
-            let mut c_args = Vec::new();
+            let mut c_args = self.options.fallback_clang_args.clone();
             c_args.push("-x".to_string().into_boxed_str());
             c_args.push("c-header".to_string().into_boxed_str());
             for header_path in header_paths {
                 c_args.push(format!("-I{header_path}").into_boxed_str());
             }
-            c_args.extend(
-                self.options
-                    .clang_args
-                    .iter()
-                    .filter(|next| {
-                        !self.options.input_headers.contains(next) &&
-                            next.as_ref() != "-include"
-                    })
-                    .cloned(),
-            );
+            for header_include in header_includes {
+                c_args.push("-include".to_string().into_boxed_str());
+                c_args.push(header_include.into_boxed_str());
+            }
             let mut tu = clang::TranslationUnit::parse(
                 &index,
-                &header_to_precompile,
+                &single_header,
                 &c_args,
                 &[],
                 clang_sys::CXTranslationUnit_ForSerialization,
@@ -2124,23 +2107,18 @@ If you encounter an error missing from this list, please file an issue or a PR!"
                 "-include-pch".to_string().into_boxed_str(),
                 pch.clone().into_boxed_str(),
             ];
-            c_args.extend(
-                self.options
-                    .clang_args
-                    .clone()
-                    .iter()
-                    .filter(|next| {
-                        !self.options.input_headers.contains(next) &&
-                            next.as_ref() != "-include"
-                    })
-                    .cloned(),
-            );
-            self.fallback_tu = Some(clang::FallbackTranslationUnit::new(
-                file,
-                header_to_precompile,
-                pch,
-                &c_args,
-            )?);
+            let mut skip_next = false;
+            for arg in self.options.fallback_clang_args.iter() {
+                if arg.as_ref() == "-include" {
+                    skip_next = true;
+                } else if skip_next {
+                    skip_next = false;
+                } else {
+                    c_args.push(arg.clone())
+                }
+            }
+            self.fallback_tu =
+                Some(clang::FallbackTranslationUnit::new(file, pch, &c_args)?);
         }
 
         self.fallback_tu.as_mut()
@@ -2274,21 +2252,17 @@ If you encounter an error missing from this list, please file an issue or a PR!"
                             );
                         }
                         break;
-                    } else {
-                        // This is _likely_, but not certainly, a macro that's
-                        // been placed just before the namespace keyword.
-                        // Unfortunately, clang tokens don't let us easily see
-                        // through the ifdef tokens, so we don't know what this
-                        // token should really be. Instead of panicking though,
-                        // we warn the user that we assumed the token was blank,
-                        // and then move on.
-                        //
-                        // See also https://github.com/rust-lang/rust-bindgen/issues/1676.
-                        warn!(
-                            "Ignored unknown namespace prefix '{}' at {token:?} in {cursor:?}",
-                            String::from_utf8_lossy(name),
-                        );
                     }
+                    // This is _likely_, but not certainly, a macro that's
+                    // been placed just before the namespace keyword.
+                    // Unfortunately, clang tokens don't let us easily see
+                    // through the ifdef tokens, so we don't know what this
+                    // token should really be. Instead of panicking though,
+                    // we warn the user that we assumed the token was blank,
+                    // and then move on.
+                    //
+                    // See also https://github.com/rust-lang/rust-bindgen/issues/1676.
+                    warn!("Ignored unknown namespace prefix '{}' at {token:?} in {cursor:?}", String::from_utf8_lossy(name));
                 }
             }
         }
@@ -2353,7 +2327,7 @@ If you encounter an error missing from this list, please file an issue or a PR!"
     /// allowlisted.
     pub(crate) fn allowlisted_items(&self) -> &ItemSet {
         assert!(self.in_codegen_phase());
-        assert!(self.current_module == self.root_module);
+        assert_eq!(self.current_module, self.root_module);
 
         self.allowlisted.as_ref().unwrap()
     }
@@ -2366,7 +2340,7 @@ If you encounter an error missing from this list, please file an issue or a PR!"
         derive_trait: DeriveTrait,
     ) -> CanDerive {
         assert!(self.in_codegen_phase());
-        assert!(self.current_module == self.root_module);
+        assert_eq!(self.current_module, self.root_module);
 
         *self
             .blocklisted_types_implement_traits
@@ -2414,14 +2388,14 @@ If you encounter an error missing from this list, please file an issue or a PR!"
     /// Get a reference to the set of items we should generate.
     pub(crate) fn codegen_items(&self) -> &ItemSet {
         assert!(self.in_codegen_phase());
-        assert!(self.current_module == self.root_module);
+        assert_eq!(self.current_module, self.root_module);
         self.codegen_items.as_ref().unwrap()
     }
 
     /// Compute the allowlisted items set and populate `self.allowlisted`.
     fn compute_allowlisted_and_codegen_items(&mut self) {
         assert!(self.in_codegen_phase());
-        assert!(self.current_module == self.root_module);
+        assert_eq!(self.current_module, self.root_module);
         assert!(self.allowlisted.is_none());
         let _t = self.timer("compute_allowlisted_and_codegen_items");
 
@@ -2616,7 +2590,7 @@ If you encounter an error missing from this list, please file an issue or a PR!"
 
     /// Call if an opaque array is generated
     pub(crate) fn generated_opaque_array(&self) {
-        self.generated_opaque_array.set(true)
+        self.generated_opaque_array.set(true);
     }
 
     /// Whether we need to generate the opaque array type

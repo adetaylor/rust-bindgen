@@ -27,9 +27,10 @@ fn should_overwrite_expected() -> bool {
         if var == "1" {
             return true;
         }
-        if var != "0" && var != "" {
-            panic!("Invalid value of BINDGEN_OVERWRITE_EXPECTED");
-        }
+        assert!(
+            var == "0" || var == "",
+            "Invalid value of BINDGEN_OVERWRITE_EXPECTED"
+        );
     }
     false
 }

@@ -19,7 +19,7 @@ use std::str::FromStr;
 
 const RUST_DERIVE_FUNPTR_LIMIT: usize = 12;
 
-/// What kind of a function are we looking at?
+/// What kind of function are we looking at?
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub(crate) enum FunctionKind {
     /// A plain, free function.
@@ -346,8 +346,8 @@ pub(crate) enum ClangAbi {
 
 impl ClangAbi {
     /// Returns whether this Abi is known or not.
-    fn is_unknown(&self) -> bool {
-        matches!(*self, ClangAbi::Unknown(..))
+    fn is_unknown(self) -> bool {
+        matches!(self, ClangAbi::Unknown(..))
     }
 }
 
@@ -389,15 +389,15 @@ pub(crate) struct FunctionSig {
 fn get_abi(cc: CXCallingConv) -> ClangAbi {
     use clang_sys::*;
     match cc {
-        CXCallingConv_Default => ClangAbi::Known(Abi::C),
-        CXCallingConv_C => ClangAbi::Known(Abi::C),
+        CXCallingConv_Default | CXCallingConv_C => ClangAbi::Known(Abi::C),
         CXCallingConv_X86StdCall => ClangAbi::Known(Abi::Stdcall),
         CXCallingConv_X86FastCall => ClangAbi::Known(Abi::Fastcall),
         CXCallingConv_X86ThisCall => ClangAbi::Known(Abi::ThisCall),
-        CXCallingConv_X86VectorCall => ClangAbi::Known(Abi::Vectorcall),
+        CXCallingConv_X86VectorCall | CXCallingConv_AArch64VectorCall => {
+            ClangAbi::Known(Abi::Vectorcall)
+        }
         CXCallingConv_AAPCS => ClangAbi::Known(Abi::Aapcs),
         CXCallingConv_X86_64Win64 => ClangAbi::Known(Abi::Win64),
-        CXCallingConv_AArch64VectorCall => ClangAbi::Known(Abi::Vectorcall),
         other => ClangAbi::Unknown(other),
     }
 }
