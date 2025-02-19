@@ -140,7 +140,9 @@ fn compare_item_info(
             expected,
             generated,
         ),
-        DiscoveredItem::Enum { .. } => compare_enum_info(expected_item, generated_item),
+        DiscoveredItem::Enum { .. } => {
+            compare_enum_info(expected_item, generated_item)
+        }
         // DiscoveredItem::Mod { final_name } => todo!(),
         // DiscoveredItem::Function { final_name } => todo!(),
         // DiscoveredItem::Method { final_name, parent } => todo!(),
@@ -221,7 +223,6 @@ pub fn compare_union_info(
         _ => false,
     }
 }
-
 
 pub fn compare_enum_info(
     expected_item: &DiscoveredItem,
