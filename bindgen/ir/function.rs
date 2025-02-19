@@ -935,7 +935,7 @@ impl ClangSubItemParser for Function {
                 Some(SpecialMemberKind::CopyConstructor)
             } else if cursor.is_move_constructor() {
                 Some(SpecialMemberKind::MoveConstructor)
-            } else if cursor.kind() == clang_sys::CXCursor_Destructor {
+            } else if cursor.kind() == CXCursor_Destructor {
                 Some(SpecialMemberKind::Destructor)
             } else {
                 None
