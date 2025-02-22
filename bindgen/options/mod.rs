@@ -225,35 +225,6 @@ options! {
         as_args: "--use-reference-newtype-wrapper",
     },
 
-    /// Use a newtype wrapper to denote types with "missing" C++ template
-    /// arguments. Sometimes bindgen is unable to see the purpose of
-    /// a given template argument, because it doesn't translate to
-    /// a real purpose in the generated Rust code (e.g. for SFINAE type
-    /// tricks for compile-time evaluation on the C++ side). Bindgen
-    /// thus omits these template parameters. But this can cause problems
-    /// for postprocessors which expect to see all template parameters;
-    /// when this option is enabled we denote these types using a newtype
-    /// wrapper.
-    /// The newtype wrapper will be a fake type called
-    /// `bindgen_marker_MissingTemplateParam`.
-    /// It's assumed that you will replace this with some
-    /// real sensible newtype wrapper of your own, either by post-processing
-    /// the output of bindgen, or by using a `use` statemet injected using
-    /// `--module-raw-lines` or similar.
-    use_unused_template_param_newtype_wrapper: bool {
-        methods: {
-            /// If this is true, wrap types that don't have a complete set
-            /// of template parameters in a fake newtype
-            /// wrapper which post-processors can replace with something
-            /// more sensible.
-            pub fn use_unused_template_param_newtype_wrapper(mut self, doit: bool) -> Builder {
-                self.options.use_unused_template_param_newtype_wrapper = doit;
-                self
-            }
-        },
-        as_args: "--use-unused-template-param-newtype-wrapper",
-    },
-
     /// Whether we should distinguish between C++'s 'char16_t' and 'u16'.
     /// The C++ type `char16_t` is its own special type; it's not a typedef
     /// of some other integer (this differs from C).
