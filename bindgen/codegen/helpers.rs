@@ -419,11 +419,3 @@ pub(crate) fn reference(ty_ptr: syn::TypePtr, is_rvalue: bool, ctx: &BindgenCont
         ptr
     }
 }
-
-pub(crate) fn with_unused_template_args(inner: syn::Type, ctx: &BindgenContext) -> syn::Type {
-    if ctx.options().use_unused_template_param_newtype_wrapper {
-        syn::parse_quote! { __bindgen_marker_UnusedTemplateParam< #inner > }
-    } else {
-        inner
-    }
-}

@@ -4561,21 +4561,12 @@ impl TryToRustTy for TemplateInstantiation {
             })
             .collect::<error::Result<Vec<_>>>()?;
 
-        let has_unused_template_args = def_params
-            .iter()
-            // Only pass type arguments for the type parameters that
-            // the def uses.
-            .any(|param| !ctx.uses_template_parameter(def.id(), *param));
         let inner = if template_args.is_empty() {
             syn::parse_quote! { #ty }
         } else {
             syn::parse_quote! { #ty<#(#template_args),*> }
         };
-        Ok(if has_unused_template_args {
-            helpers::with_unused_template_args(inner, ctx)
-        } else {
-            inner
-        })
+        Ok(inner)
     }
 }
 
