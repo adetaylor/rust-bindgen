@@ -1218,6 +1218,23 @@ options! {
             }
         },
     },
+    /// The set of raw lines to be prepended to every module of the generated Rust code.
+    all_module_raw_lines: Vec<Box<str>> {
+        methods: {
+            /// Add a line of Rust code at the beginning of the generated bindings. The string is
+            /// passed through without any modification.
+            pub fn all_module_raw_line<T: Into<String>>(mut self, arg: T) -> Self {
+                self.options.all_module_raw_lines.push(arg.into().into_boxed_str());
+                self
+            }
+        },
+        as_args: |raw_lines, args| {
+            for line in raw_lines {
+                args.push("--all-module-raw-line".to_owned());
+                args.push(line.clone().into());
+            }
+        },
+    },
     /// The set of raw lines to prepend to different modules.
     module_lines: HashMap<Box<str>, Vec<Box<str>>> {
         methods: {

@@ -336,6 +336,9 @@ struct BindgenCommand {
     /// Add a raw line of Rust code at the beginning of output.
     #[arg(long)]
     raw_line: Vec<String>,
+    /// Add a raw line of Rust code at the beginning of each module.
+    #[arg(long)]
+    all_module_raw_line: Vec<String>,
     /// Add a RAW_LINE of Rust code to a given module with name MODULE_NAME.
     #[arg(long, number_of_values = 2, value_names = ["MODULE_NAME", "RAW_LINE"])]
     module_raw_line: Vec<String>,
@@ -604,6 +607,7 @@ where
         opaque_type,
         output,
         raw_line,
+        all_module_raw_line,
         module_raw_line,
         rust_target,
         rust_edition,

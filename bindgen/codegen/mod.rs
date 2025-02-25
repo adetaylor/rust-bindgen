@@ -608,13 +608,16 @@ impl CodeGenerator for Module {
                 .namespace_aware_canonical_path(ctx)
                 .join("::")
                 .into_boxed_str();
-            if let Some(raw_lines) = ctx.options().module_lines.get(&path) {
-                for raw_line in raw_lines {
-                    found_any = true;
-                    result.push(
-                        proc_macro2::TokenStream::from_str(raw_line).unwrap(),
-                    );
-                }
+
+            let all_module_raw_lines = ctx.options().all_module_raw_lines.iter();
+            let this_module_raw_lines = ctx.options().module_lines.get(&path).into_iter().flat_map(
+                |v| v.iter()
+            );
+            for raw_line in all_module_raw_lines.chain(this_module_raw_lines) {
+                found_any = true;
+                result.push(
+                    proc_macro2::TokenStream::from_str(raw_line).unwrap(),
+                );
             }
 
             codegen_self(result, &mut found_any);
