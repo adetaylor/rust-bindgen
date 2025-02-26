@@ -21,7 +21,7 @@ use self::struct_layout::StructLayoutTracker;
 use super::BindgenOptions;
 
 use crate::callbacks::{
-    AttributeInfo, DeriveInfo, DiscoveredItem, DiscoveredItemId, Explicitness, FieldInfo, TypeKind as DeriveTypeKind
+    AttributeInfo, DeriveInfo, DiscoveredItem, DiscoveredItemId, Explicitness, FieldInfo, ItemInfo, TypeKind as DeriveTypeKind
 };
 use crate::codegen::error::Error;
 use crate::ir::analysis::{HasVtable, Sizedness};
@@ -3090,6 +3090,15 @@ impl Method {
             MethodKind::Destructor => "destruct".into(),
             _ => function.name().to_owned(),
         };
+
+        if let Some(nm) = ctx.options().last_callback(|callbacks| {
+            callbacks.generated_name_override(ItemInfo {
+                name: name.as_str(),
+                kind: crate::callbacks::ItemKind::Function,
+            })
+        }) {
+            name = nm;
+        }
 
         let TypeKind::Function(ref signature) =
             *signature_item.expect_type().kind()
