@@ -2362,12 +2362,9 @@ impl CodeGenerator for CompInfo {
 
             if has_address {
                 let layout = Layout::new(1, 1);
-                // Normally for opaque data we use helpers::blob,
-                // which may wrap it in __bindgen_marker_Opaque<T>.
-                // Downstream tools may then use this as a sign that
-                // the type is complex or can't be stack-allocated,
-                // etc. But in this case this one-byte field is harmless
-                // so we'll just represent it without that extra marker.
+                // Don't use __bindgen_marker_Opaque for this harmless one-byte
+                // field. See StructLayoutTracker::padding_field() for a longer
+                // explanation of blob_inner() vs blob().
                 let ty = helpers::blob_inner(ctx, Layout::new(1, 1), false);
                 struct_layout.saw_field_with_layout(
                     "_address",
