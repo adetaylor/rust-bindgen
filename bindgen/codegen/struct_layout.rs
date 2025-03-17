@@ -393,7 +393,12 @@ impl<'a> StructLayoutTracker<'a> {
     }
 
     fn padding_field(&mut self, layout: Layout) -> proc_macro2::TokenStream {
-        let ty = helpers::blob(self.ctx, layout, false);
+        // Normally for opaque data we use helpers::blob(), which may wrap it
+        // __bindgen_marker_Opaque<T>. Downstream tools may then use this as a
+        // sign that the type is complex or can't be stack-allocated, etc. But
+        // in this case the padding is just plain data, so we want to represent
+        // it without the extra marker.
+        let ty = helpers::blob_inner(self.ctx, layout, false);
         let padding_count = self.padding_count;
 
         self.padding_count += 1;
